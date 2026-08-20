@@ -34,6 +34,7 @@
 namespace GlpiPlugin\Fleetview\Masternaut;
 
 use GlpiPlugin\Fleetview\PluginConfig;
+use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\GuzzleException;
 use Psr\SimpleCache\CacheInterface;
 use Safe\Exceptions\JsonException;
@@ -60,10 +61,12 @@ final class MasternautClient
     private array $config;
 
     /**
-     * @param ?array<string, string> $config Configuration override (defaults
-     *                                       to the stored plugin configuration)
+     * @param ?array<string, string> $config      Configuration override
+     *        (defaults to the stored plugin configuration)
+     * @param ?ClientInterface       $http_client HTTP client override, mainly
+     *        for tests (defaults to the GLPI Guzzle client, proxy-aware)
      */
-    public function __construct(?array $config = null)
+    public function __construct(?array $config = null, private ?ClientInterface $http_client = null)
     {
         $this->config = $config ?? PluginConfig::getConfig();
     }
@@ -236,7 +239,7 @@ final class MasternautClient
 
         $cached = $GLPI_CACHE->get($cache_key);
         if (is_array($cached)) {
-            return $this->buildVehicleList($cached);
+            return $this->sanitizeVehicleList($cached);
         }
 
         $response = $this->request('vehicle');
@@ -285,6 +288,44 @@ final class MasternautClient
         }
 
         usort($vehicles, static fn(array $a, array $b) => strnatcasecmp($a['name'], $b['name']));
+
+        return $vehicles;
+    }
+
+    /**
+     * Re-validate already-built vehicle entries coming from the cache
+     * (built shape, not the raw API payload handled by buildVehicleList).
+     *
+     * @param array<array-key, mixed> $entries
+     *
+     * @return list<array{
+     *      id: string,
+     *      name: string,
+     *      registration: string,
+     *      group: string,
+     *      type: string,
+     *      make_model: string,
+     *      status: string,
+     * }>
+     */
+    private function sanitizeVehicleList(array $entries): array
+    {
+        $vehicles = [];
+        foreach ($entries as $entry) {
+            if (!is_array($entry) || !isset($entry['id'])) {
+                continue;
+            }
+
+            $vehicles[] = [
+                'id'           => $this->toString($entry['id']),
+                'name'         => $this->toString($entry['name'] ?? null),
+                'registration' => $this->toString($entry['registration'] ?? null),
+                'group'        => $this->toString($entry['group'] ?? null),
+                'type'         => $this->toString($entry['type'] ?? null),
+                'make_model'   => $this->toString($entry['make_model'] ?? null),
+                'status'       => $this->toString($entry['status'] ?? null),
+            ];
+        }
 
         return $vehicles;
     }
@@ -340,7 +381,7 @@ final class MasternautClient
             ltrim($path, '/'),
         );
 
-        $client = Toolbox::getGuzzleClient([
+        $client = $this->http_client ?? Toolbox::getGuzzleClient([
             'timeout' => 15,
             'headers' => [
                 'Accept'          => 'application/json',

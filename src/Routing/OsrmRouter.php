@@ -33,6 +33,7 @@
 
 namespace GlpiPlugin\Fleetview\Routing;
 
+use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\GuzzleException;
 use Psr\SimpleCache\CacheInterface;
 use Safe\Exceptions\JsonException;
@@ -50,7 +51,11 @@ final class OsrmRouter
     /** Routes barely change for near-identical coordinates: cache aggressively (seconds) */
     private const CACHE_LIFETIME = 300;
 
-    public function __construct(private string $base_url)
+    /**
+     * @param ?ClientInterface $http_client HTTP client override, mainly for
+     *        tests (defaults to the GLPI Guzzle client, proxy-aware)
+     */
+    public function __construct(private string $base_url, private ?ClientInterface $http_client = null)
     {
         $this->base_url = rtrim(trim($base_url), '/');
     }
@@ -93,7 +98,8 @@ final class OsrmRouter
         $url = sprintf('%s/table/v1/driving/%s', $this->base_url, $coordinates);
 
         try {
-            $response = Toolbox::getGuzzleClient(['timeout' => 8])->request('GET', $url, [
+            $client   = $this->http_client ?? Toolbox::getGuzzleClient(['timeout' => 8]);
+            $response = $client->request('GET', $url, [
                 'query'       => [
                     'sources'     => '0',
                     'annotations' => 'duration,distance',
