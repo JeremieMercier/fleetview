@@ -193,18 +193,17 @@
             + ` brightness(${(l / base.l).toFixed(2)})`;
     };
 
-    const rankColor = (index, colors) => {
-        if (index === 0) {
-            return colors.top1;
-        }
-        return index <= 2 ? colors.top3 : colors.others;
-    };
+    // Native Leaflet blue, used for every vehicle beyond the podium
+    const DEFAULT_MARKER_COLOR = '#2a81cb';
+
+    const rankColor = (index, colors) => [colors.top1, colors.top2, colors.top3][index] ?? null;
 
     const updateLegend = (colors) => {
         const entries = [
-            [colors.top1, __('closest', 'fleetview')],
-            [colors.top3, __('top 3', 'fleetview')],
-            [colors.others, __('others', 'fleetview')],
+            [colors.top1, __('1st', 'fleetview')],
+            [colors.top2, __('2nd', 'fleetview')],
+            [colors.top3, __('3rd', 'fleetview')],
+            [DEFAULT_MARKER_COLOR, __('others', 'fleetview')],
         ];
         document.getElementById('fleetview-legend').innerHTML = entries
             .map(([color, label]) => `<span class="ms-2 text-nowrap">`
@@ -326,7 +325,10 @@
                 const marker = L.marker([vehicle.latitude, vehicle.longitude])
                     .addTo(vehiclesLayer)
                     .bindPopup(details);
-                marker.getElement().style.filter = markerFilter(rankColor(index, data.marker_colors));
+                const color = rankColor(index, data.marker_colors);
+                if (color !== null) {
+                    marker.getElement().style.filter = markerFilter(color);
+                }
                 bounds.push([vehicle.latitude, vehicle.longitude]);
             });
             map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 });

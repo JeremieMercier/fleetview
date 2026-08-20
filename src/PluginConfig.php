@@ -84,10 +84,11 @@ final class PluginConfig extends CommonGLPI
             // OSRM-compatible routing service for driving time estimations.
             // Coordinates are sent to this third-party service; empty = disabled.
             'routing_base_url' => 'https://router.project-osrm.org',
-            // Vehicle marker colors by proximity rank (road ranking)
-            'marker_color_top1'   => '#2fb344', // closest vehicle
-            'marker_color_top3'   => '#f59f00', // 2nd and 3rd
-            'marker_color_others' => '#2a81cb', // Leaflet default blue
+            // Vehicle marker colors by proximity rank (road ranking); other
+            // vehicles keep the native Leaflet blue marker.
+            'marker_color_top1' => '#2fb344', // closest vehicle
+            'marker_color_top2' => '#f59f00', // 2nd closest
+            'marker_color_top3' => '#ae3ec9', // 3rd closest
         ];
     }
 

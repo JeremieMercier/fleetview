@@ -129,9 +129,9 @@ final class MapController extends AbstractController
             'configured'    => true,
             'radius_km'     => (float) $config['search_radius'],
             'marker_colors' => [
-                'top1'   => $config['marker_color_top1'],
-                'top3'   => $config['marker_color_top3'],
-                'others' => $config['marker_color_others'],
+                'top1' => $config['marker_color_top1'],
+                'top2' => $config['marker_color_top2'],
+                'top3' => $config['marker_color_top3'],
             ],
             'vehicles'      => $vehicles,
         ]);

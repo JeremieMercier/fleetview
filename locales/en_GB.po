@@ -130,22 +130,26 @@ msgstr[1] "%1 vehicles"
 msgid "Marker color: closest vehicle"
 msgstr "Marker color: closest vehicle"
 
-#: templates/config.html.twig
-msgid "Marker color: 2nd and 3rd closest"
-msgstr "Marker color: 2nd and 3rd closest"
-
-#: templates/config.html.twig
-msgid "Marker color: other vehicles"
-msgstr "Marker color: other vehicles"
-
-#: public/js/fleetview.js
-msgid "closest"
-msgstr "closest"
-
-#: public/js/fleetview.js
-msgid "top 3"
-msgstr "top 3"
-
 #: public/js/fleetview.js
 msgid "others"
 msgstr "others"
+
+#: templates/config.html.twig
+msgid "Marker color: 2nd closest"
+msgstr "Marker color: 2nd closest"
+
+#: templates/config.html.twig
+msgid "Marker color: 3rd closest"
+msgstr "Marker color: 3rd closest"
+
+#: public/js/fleetview.js
+msgid "1st"
+msgstr "1st"
+
+#: public/js/fleetview.js
+msgid "2nd"
+msgstr "2nd"
+
+#: public/js/fleetview.js
+msgid "3rd"
+msgstr "3rd"

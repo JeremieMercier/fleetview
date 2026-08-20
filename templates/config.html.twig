@@ -106,15 +106,15 @@
             ) }}
 
             {{ fields.colorField(
-                'marker_color_top3',
-                config['marker_color_top3'],
-                __('Marker color: 2nd and 3rd closest', 'fleetview')
+                'marker_color_top2',
+                config['marker_color_top2'],
+                __('Marker color: 2nd closest', 'fleetview')
             ) }}
 
             {{ fields.colorField(
-                'marker_color_others',
-                config['marker_color_others'],
-                __('Marker color: other vehicles', 'fleetview')
+                'marker_color_top3',
+                config['marker_color_top3'],
+                __('Marker color: 3rd closest', 'fleetview')
             ) }}
 
             {{ fields.urlField(
