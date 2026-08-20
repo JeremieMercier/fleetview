@@ -33,7 +33,12 @@
 
 $current_plugin_folder = basename(dirname(__DIR__));
 
-require __DIR__ . '/../../../tests/bootstrap.php';
+// The GLPI checkout is expected two levels up (plugins/<name>); the GLPI_ROOT
+// environment variable overrides it for setups where the plugin directory is
+// a symbolic link (relative paths resolve to the physical location).
+$glpi_root = getenv('GLPI_ROOT') ?: dirname(__DIR__, 3);
+
+require $glpi_root . '/tests/bootstrap.php';
 require dirname(__DIR__) . '/vendor/autoload.php';
 
 if (!Plugin::isPluginActive($current_plugin_folder)) {

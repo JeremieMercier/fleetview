@@ -51,6 +51,13 @@ final class TechnicianMatcher
     private ?array $index = null;
 
     /**
+     * @param ?iterable<array<array-key, mixed>> $users User rows override
+     *        (`id`, `firstname`, `realname`), mainly for unit tests; defaults
+     *        to the active, non-deleted GLPI users.
+     */
+    public function __construct(private ?iterable $users = null) {}
+
+    /**
      * GLPI user id matching the given vehicle/driver name, or null.
      */
     public function match(?string $name): ?int
@@ -79,7 +86,7 @@ final class TechnicianMatcher
 
         $this->index = [];
 
-        $iterator = $DB->request([
+        $iterator = $this->users ?? $DB->request([
             'SELECT' => ['id', 'firstname', 'realname'],
             'FROM'   => User::getTable(),
             'WHERE'  => [
