@@ -62,6 +62,7 @@
                                 <th role="button" data-sort="group">{{ __('Group') }} <i class="ti"></i></th>
                                 <th role="button" data-sort="type">{{ __('Type') }} <i class="ti"></i></th>
                                 <th role="button" data-sort="makemodel">{{ __('Make / model', 'fleetview') }} <i class="ti"></i></th>
+                                <th role="button" data-sort="status">{{ __('Status') }} <i class="ti"></i></th>
                                 <th role="button" data-sort="state" class="w-33">{{ 'User'|itemtype_name }} <i class="ti"></i></th>
                             </tr>
                             <tr>
@@ -79,6 +80,11 @@
                                 </th>
                                 <th><input type="text" class="form-control form-control-sm" data-filter="makemodel" placeholder="{{ __('Filter…', 'fleetview') }}"></th>
                                 <th>
+                                    <select class="form-select form-select-sm" data-filter-select="status">
+                                        <option value="">{{ __('All', 'fleetview') }}</option>
+                                    </select>
+                                </th>
+                                <th>
                                     <select class="form-select form-select-sm" data-filter-select="state">
                                         <option value="">{{ __('All', 'fleetview') }}</option>
                                         <option value="mapped">{{ __('Associated', 'fleetview') }}</option>
@@ -95,12 +101,14 @@
                                     data-group="{{ vehicle.group }}"
                                     data-type="{{ vehicle.type }}"
                                     data-makemodel="{{ vehicle.make_model }}"
+                                    data-status="{{ vehicle.status_label }}"
                                     data-state="{{ vehicle.users_id > 0 ? 'mapped' : (vehicle.suggested_id > 0 ? 'suggested' : 'none') }}">
                                     <td>{{ vehicle.name }}</td>
                                     <td>{{ vehicle.registration }}</td>
                                     <td>{{ vehicle.group }}</td>
                                     <td>{{ vehicle.type }}</td>
                                     <td>{{ vehicle.make_model }}</td>
+                                    <td>{{ vehicle.status_label }}</td>
                                     <td>
                                         <input type="hidden" name="labels[{{ vehicle.id }}]" value="{{ vehicle.name }}" />
                                         {% do call('User::dropdown', [{
@@ -128,7 +136,7 @@
                     const count = document.getElementById('fleetview-filter-count');
 
                     // Feed the group/type filter dropdowns with existing values
-                    for (const key of ['group', 'type']) {
+                    for (const key of ['group', 'type', 'status']) {
                         const select = table.querySelector(`[data-filter-select="${key}"]`);
                         const values = [...new Set(rows().map((r) => r.dataset[key]).filter(Boolean))]
                             .sort((a, b) => a.localeCompare(b));

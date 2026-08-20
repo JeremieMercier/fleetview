@@ -175,6 +175,7 @@ final class MasternautClient
      *      group: string,
      *      type: string,
      *      make_model: string,
+     *      status: string,
      * }>
      *
      * @throws MasternautApiException
@@ -206,6 +207,7 @@ final class MasternautClient
                 'group'        => (string) ($item['groupName'] ?? ''),
                 'type'         => (string) ($item['type'] ?? ''),
                 'make_model'   => trim(((string) ($item['make'] ?? '')) . ' ' . ((string) ($item['model'] ?? ''))),
+                'status'       => (string) ($item['status'] ?? ''),
             ];
         }
 

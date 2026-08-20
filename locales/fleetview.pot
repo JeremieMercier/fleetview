@@ -257,3 +257,11 @@ msgstr ""
 #: templates/config_mappings.html.twig
 msgid "Not associated"
 msgstr ""
+
+#: src/PluginConfig.php
+msgid "In circulation"
+msgstr ""
+
+#: src/PluginConfig.php
+msgid "In maintenance"
+msgstr ""

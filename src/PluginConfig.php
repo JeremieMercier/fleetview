@@ -230,6 +230,11 @@ final class PluginConfig extends CommonGLPI
                 $matcher  = new TechnicianMatcher();
                 foreach ($client->getVehicles() as $vehicle) {
                     $users_id = $mappings[$vehicle['id']] ?? 0;
+                    $vehicle['status_label'] = match ($vehicle['status']) {
+                        'IN_CIRCULATION' => __('In circulation', 'fleetview'),
+                        'IN_MAINTENANCE' => __('In maintenance', 'fleetview'),
+                        default          => $vehicle['status'],
+                    };
                     $vehicles[] = $vehicle + [
                         'users_id'     => $users_id,
                         'suggested_id' => $users_id === 0 ? ($matcher->match($vehicle['name']) ?? 0) : 0,
