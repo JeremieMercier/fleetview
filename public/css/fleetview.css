@@ -16,6 +16,31 @@
     border-bottom-right-radius: var(--tblr-border-radius, 4px);
 }
 
+/* "Nearby technicians" button under the assignee field: same width as the
+   actor fields, comfortable height, subtle accent on hover */
+#fleetview-open {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.55rem 0.75rem;
+    font-weight: 500;
+    border-style: dashed;
+}
+
+#fleetview-open .ti {
+    font-size: 1.15em;
+}
+
+#fleetview-open:hover,
+#fleetview-open:focus-visible {
+    border-style: solid;
+    color: var(--tblr-primary, #206bc4);
+    border-color: var(--tblr-primary, #206bc4);
+    background-color: var(--tblr-primary-lt, rgba(32, 107, 196, 0.08));
+}
+
 /* Colored dots of the proximity legend in the modal toolbar */
 .fleetview-dot {
     display: inline-block;

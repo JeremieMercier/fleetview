@@ -429,8 +429,8 @@
         const button = document.createElement('button');
         button.type = 'button';
         button.id = 'fleetview-open';
-        button.className = 'btn btn-sm btn-outline-secondary mt-2';
-        button.innerHTML = `<i class="ti ti-map-pin me-1"></i>${__('Nearby technicians', 'fleetview')}`;
+        button.className = 'btn btn-outline-secondary mt-2';
+        button.innerHTML = `<i class="ti ti-map-pin"></i>${__('Nearby technicians', 'fleetview')}`;
         button.addEventListener('click', () => openMap(ticketId, context));
 
         const fieldContainer = assignSelect.closest('.form-field') ?? assignSelect.parentElement;
