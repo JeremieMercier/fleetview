@@ -149,3 +149,31 @@ msgstr ""
 #: templates/config.html.twig
 msgid "Marker color: ticket location"
 msgstr ""
+
+#: public/js/fleetview.js
+msgid "Assign this technician"
+msgstr ""
+
+#: public/js/fleetview.js
+msgid "Assigned"
+msgstr ""
+
+#: public/js/fleetview.js
+msgid "%1 has been assigned to the ticket. Reloading…"
+msgstr ""
+
+#: src/Controller/MapController.php public/js/fleetview.js
+msgid "Unable to assign the technician."
+msgstr ""
+
+#: src/Controller/MapController.php
+msgid "You are not allowed to assign this ticket."
+msgstr ""
+
+#: src/Controller/MapController.php
+msgid "Ticket not found"
+msgstr ""
+
+#: src/Controller/MapController.php
+msgid "User not found"
+msgstr ""

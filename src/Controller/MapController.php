@@ -34,11 +34,15 @@
 namespace GlpiPlugin\Fleetview\Controller;
 
 use Glpi\Controller\AbstractController;
+use CommonITILActor;
 use GlpiPlugin\Fleetview\Masternaut\MasternautApiException;
 use GlpiPlugin\Fleetview\Masternaut\MasternautClient;
 use GlpiPlugin\Fleetview\PluginConfig;
 use GlpiPlugin\Fleetview\Routing\OsrmRouter;
+use GlpiPlugin\Fleetview\TechnicianMatcher;
 use Location;
+use Ticket_User;
+use User;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -126,8 +130,20 @@ final class MapController extends AbstractController
         usort($vehicles, static fn(array $a, array $b) => ($a['travel_time_min'] ?? PHP_INT_MAX) <=> ($b['travel_time_min'] ?? PHP_INT_MAX)
             ?: $a['distance_km'] <=> $b['distance_km']);
 
+        // Link vehicles to GLPI users so they can be assigned from the modal
+        $can_assign = $ticket->canAssign();
+        $matcher    = new TechnicianMatcher();
+        foreach ($vehicles as &$vehicle) {
+            $user_id = $can_assign
+                ? ($matcher->match($vehicle['label']) ?? $matcher->match($vehicle['driver_name']))
+                : null;
+            $vehicle['user_id'] = $user_id;
+        }
+        unset($vehicle);
+
         return new JsonResponse([
             'configured'    => true,
+            'can_assign'    => $can_assign,
             'radius_km'     => (float) $config['search_radius'],
             'marker_colors' => [
                 'top1' => $config['marker_color_top1'],
@@ -135,6 +151,56 @@ final class MapController extends AbstractController
                 'top3' => $config['marker_color_top3'],
             ],
             'vehicles'      => $vehicles,
+        ]);
+    }
+
+    /**
+     * Assign a technician (matched from a fleet vehicle) to the ticket.
+     */
+    #[Route(path: 'ticket/{id}/assign', name: 'ticket_assign', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function assignTechnician(Request $request, int $id): JsonResponse
+    {
+        $ticket = Ticket::getById($id);
+        if ($ticket === false || !$ticket->canViewItem()) {
+            return new JsonResponse(['error' => __('Ticket not found', 'fleetview')], Response::HTTP_NOT_FOUND);
+        }
+
+        if (!$ticket->canAssign()) {
+            return new JsonResponse(['error' => __('You are not allowed to assign this ticket.', 'fleetview')], Response::HTTP_FORBIDDEN);
+        }
+
+        $payload  = json_decode((string) $request->getContent(), true);
+        $users_id = is_array($payload) && is_numeric($payload['users_id'] ?? null) ? (int) $payload['users_id'] : 0;
+
+        $user = User::getById($users_id);
+        if ($user === false || !$user->fields['is_active'] || $user->fields['is_deleted']) {
+            return new JsonResponse(['error' => __('User not found', 'fleetview')], Response::HTTP_BAD_REQUEST);
+        }
+
+        $ticket_user = new Ticket_User();
+        $already = $ticket_user->getFromDBByCrit([
+            'tickets_id' => $id,
+            'users_id'   => $users_id,
+            'type'       => CommonITILActor::ASSIGN,
+        ]);
+
+        if (!$already) {
+            $added = $ticket_user->add([
+                'tickets_id'       => $id,
+                'users_id'         => $users_id,
+                'type'             => CommonITILActor::ASSIGN,
+                'use_notification' => 1,
+            ]);
+
+            if (!$added) {
+                return new JsonResponse(['error' => __('Unable to assign the technician.', 'fleetview')], Response::HTTP_INTERNAL_SERVER_ERROR);
+            }
+        }
+
+        return new JsonResponse([
+            'success'   => true,
+            'already'   => $already,
+            'user_name' => $user->getFriendlyName(),
         ]);
     }
 

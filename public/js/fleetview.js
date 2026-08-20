@@ -29,7 +29,7 @@
  * -------------------------------------------------------------------------
  */
 
-/* global CFG_GLPI, bootstrap, L */
+/* global CFG_GLPI, bootstrap, L, getAjaxCsrfToken */
 
 (() => {
     'use strict';
@@ -105,7 +105,45 @@
             }
         });
 
+        // Assign buttons live inside Leaflet popups (dynamic DOM): delegate
+        document.getElementById('fleetview-modal').addEventListener('click', (event) => {
+            const button = event.target.closest('.fleetview-assign');
+            if (button && currentTicketId !== null) {
+                assignTechnician(button);
+            }
+        });
+
         return document.getElementById('fleetview-modal');
+    };
+
+    const assignTechnician = async (button) => {
+        button.disabled = true;
+
+        try {
+            const response = await fetch(`${PLUGIN_URL}/ticket/${currentTicketId}/assign`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-Glpi-Csrf-Token': getAjaxCsrfToken(),
+                },
+                body: JSON.stringify({ users_id: Number(button.dataset.usersId) }),
+            });
+            const data = await response.json();
+
+            if (!data.success) {
+                button.disabled = false;
+                showAlert(data.error ?? __('Unable to assign the technician.', 'fleetview'), 'danger');
+                return;
+            }
+
+            button.innerHTML = `<i class="ti ti-check me-1"></i>${__('Assigned', 'fleetview')}`;
+            showAlert(__('%1 has been assigned to the ticket. Reloading…', 'fleetview', data.user_name), 'success');
+            setTimeout(() => window.location.reload(), 1500);
+        } catch {
+            button.disabled = false;
+            showAlert(__('Unable to assign the technician.', 'fleetview'), 'danger');
+        }
     };
 
     // Radius choices offered in the modal (km); the configured radius is
@@ -324,12 +362,18 @@
                     )
                     : null;
 
+                const assign = data.can_assign && vehicle.user_id !== null
+                    ? `<button type="button" class="btn btn-sm btn-primary mt-2 fleetview-assign" data-users-id="${vehicle.user_id}">`
+                        + `<i class="ti ti-user-plus me-1"></i>${__('Assign this technician', 'fleetview')}</button>`
+                    : null;
+
                 const details = [
                     `<strong>${_.escape(vehicle.label)}</strong>`,
                     vehicle.driver_name ? `<i class="ti ti-user"></i> ${_.escape(vehicle.driver_name)}` : null,
                     `<i class="ti ti-route"></i> ${__('%1 km as the crow flies', 'fleetview', vehicle.distance_km)}`,
                     travel ? `<i class="ti ti-car"></i> ${travel}` : null,
                     `<i class="ti ti-clock"></i> ${_.escape(formatDate(vehicle.updated_at))}`,
+                    assign,
                 ].filter(Boolean).join('<br>');
 
                 const marker = L.marker([vehicle.latitude, vehicle.longitude])
