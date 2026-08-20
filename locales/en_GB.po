@@ -153,3 +153,7 @@ msgstr "2nd"
 #: public/js/fleetview.js
 msgid "3rd"
 msgstr "3rd"
+
+#: templates/config.html.twig
+msgid "Marker color: ticket location"
+msgstr "Marker color: ticket location"

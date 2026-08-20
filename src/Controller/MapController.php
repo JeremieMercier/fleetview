@@ -65,9 +65,10 @@ final class MapController extends AbstractController
         }
 
         return new JsonResponse([
-            'available'  => $this->getTicketLocation($ticket) !== null,
-            'configured' => PluginConfig::isApiConfigured(),
-            'location'   => $this->getTicketLocation($ticket),
+            'available'     => $this->getTicketLocation($ticket) !== null,
+            'configured'    => PluginConfig::isApiConfigured(),
+            'location'      => $this->getTicketLocation($ticket),
+            'marker_color'  => PluginConfig::getConfig()['marker_color_ticket'],
         ]);
     }
 

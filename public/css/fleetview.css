@@ -16,12 +16,6 @@
     border-bottom-right-radius: var(--tblr-border-radius, 4px);
 }
 
-/* Native Leaflet marker recolored from blue (hue ≈ 207°) to red; the class
-   is also set on the shadow image, which hue-rotate leaves visually intact */
-img.fleetview-ticket-marker {
-    filter: hue-rotate(150deg) saturate(1.2);
-}
-
 /* Colored dots of the proximity legend in the modal toolbar */
 .fleetview-dot {
     display: inline-block;

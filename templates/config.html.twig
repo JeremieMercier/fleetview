@@ -100,6 +100,12 @@
             ) }}
 
             {{ fields.colorField(
+                'marker_color_ticket',
+                config['marker_color_ticket'],
+                __('Marker color: ticket location', 'fleetview')
+            ) }}
+
+            {{ fields.colorField(
                 'marker_color_top1',
                 config['marker_color_top1'],
                 __('Marker color: closest vehicle', 'fleetview')

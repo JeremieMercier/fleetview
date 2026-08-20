@@ -150,9 +150,9 @@
         return Number.isNaN(date.getTime()) ? utcDate : date.toLocaleString();
     };
 
-    // Native Leaflet marker for the ticket location, recolored to red with a
-    // CSS hue-rotate filter (see fleetview.css) so it stays visually
-    // consistent with the default blue vehicle markers.
+    // Native Leaflet marker recolored for the ticket location (configured
+    // color, red by default) so it stays visually consistent with the
+    // vehicle markers.
     const ticketIcon = () => {
         const icon = new L.Icon.Default();
         icon.options.className = 'fleetview-ticket-marker';
@@ -250,6 +250,16 @@
             L.marker([latitude, longitude], { icon: ticketIcon(), zIndexOffset: 1000 })
                 .addTo(map)
                 .bindPopup(`<strong>${_.escape(name)}</strong>`);
+        }
+
+        // Configured ticket marker color, applied through a dynamic CSS rule
+        // so it works whenever the marker icon is (re)rendered.
+        {
+            document.getElementById('fleetview-ticket-marker-style')?.remove();
+            const style = document.createElement('style');
+            style.id = 'fleetview-ticket-marker-style';
+            style.textContent = `img.fleetview-ticket-marker { filter: ${markerFilter(context.marker_color)}; }`;
+            document.head.appendChild(style);
         }
 
         await waitModalShown(modalEl);
