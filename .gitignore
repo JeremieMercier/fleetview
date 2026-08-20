@@ -1,0 +1,18 @@
+dist/
+node_modules/
+vendor/
+.gh_token
+*.min.*
+var
+/.vscode/
+/.idea/
+
+# Proprietary API documentation (Masternaut / Michelin Connected Fleet)
+/docs/api/*
+!/docs/api/README.md
+
+# Secrets — never commit credentials
+.env
+.env.*
+*.local.php
+/secrets/
