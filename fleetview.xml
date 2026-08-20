@@ -37,16 +37,22 @@
       <lang>fr_FR</lang>
    </langs>
    <license>MIT</license>
-   <!--tags>
+   <tags>
       <en>
-         <tag>One tag</tag>
-         <tag>Another tag</tag>
+         <tag>geolocation</tag>
+         <tag>map</tag>
+         <tag>tickets</tag>
+         <tag>fleet</tag>
+         <tag>technicians</tag>
       </en>
       <fr>
-         <tag>Un tag</tag>
-         <tag>Un autre tag</tag>
+         <tag>géolocalisation</tag>
+         <tag>carte</tag>
+         <tag>tickets</tag>
+         <tag>flotte</tag>
+         <tag>techniciens</tag>
       </fr>
-   </tags-->
+   </tags>
    <!--screenshots>
       <screenshot>https://github.com/JeremieMercier/fleetview/raw/main/screenshot.png</screenshot>
       <screenshot>https://github.com/JeremieMercier/fleetview/raw/main/screenshot2.png</screenshot>
