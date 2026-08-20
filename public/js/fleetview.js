@@ -147,8 +147,8 @@
     };
 
     // Radius choices offered in the modal (km); the configured radius is
-    // inserted on first load if missing.
-    const RADIUS_CHOICES = [25, 50, 100, 150, 200, 300, 500];
+    // inserted on first load if missing. Keep in sync with PluginConfig.
+    const RADIUS_CHOICES = [25, 50, 75, 100, 125, 150, 175, 200, 250, 300, 400, 500];
 
     const syncRadiusSelect = (radiusKm) => {
         const select = document.getElementById('fleetview-radius');

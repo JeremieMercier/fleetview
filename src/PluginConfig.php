@@ -235,9 +235,10 @@ final class PluginConfig extends CommonGLPI
 
         $config = self::getConfig();
 
-        // Same radius choices as the modal selector; keep the current value
+        // Same radius choices as the modal selector (keep in sync with
+        // RADIUS_CHOICES in fleetview.js); the current value stays
         // selectable even if it is not part of the presets
-        $radius_choices = [25, 50, 100, 150, 200, 300, 500];
+        $radius_choices = [25, 50, 75, 100, 125, 150, 175, 200, 250, 300, 400, 500];
         $radius_choices[] = (int) $config['search_radius'];
         $radius_choices = array_unique($radius_choices);
         sort($radius_choices);
