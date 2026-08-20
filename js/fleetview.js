@@ -93,21 +93,37 @@
         return document.getElementById('fleetview-modal');
     };
 
-    const showAlert = (message) => {
+    const showAlert = (message, level = 'warning') => {
         const alert = document.getElementById('fleetview-alert');
         alert.textContent = message;
-        alert.classList.remove('d-none');
+        alert.className = `alert alert-${level} m-3`;
+    };
+
+    const hideAlert = () => {
+        document.getElementById('fleetview-alert').className = 'alert m-3 d-none';
+    };
+
+    const formatDate = (utcDate) => {
+        if (!utcDate) {
+            return '';
+        }
+        // API dates are UTC without timezone marker (YYYY-MM-DDThh:mm:ss.ms)
+        const date = new Date(`${utcDate}Z`);
+        return Number.isNaN(date.getTime()) ? utcDate : date.toLocaleString();
     };
 
     let map = null;
-    const openMap = async (context) => {
+    let vehiclesLayer = null;
+
+    const openMap = async (ticketId, context) => {
         const modalEl = document.getElementById('fleetview-modal') ?? buildModal();
         bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        hideAlert();
 
         try {
             await loadLeaflet();
         } catch {
-            showAlert(__('Unable to load the map library.', 'fleetview'));
+            showAlert(__('Unable to load the map library.', 'fleetview'), 'danger');
             return;
         }
 
@@ -118,39 +134,65 @@
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
             }).addTo(map);
+            vehiclesLayer = L.layerGroup().addTo(map);
+
+            L.marker([latitude, longitude])
+                .addTo(map)
+                .bindPopup(`<strong>${_.escape(name)}</strong>`);
         }
         map.setView([latitude, longitude], 11);
 
         // The modal animation breaks Leaflet's size computation
         setTimeout(() => map.invalidateSize(), 300);
 
-        L.marker([latitude, longitude])
-            .addTo(map)
-            .bindPopup(`<strong>${_.escape(name)}</strong>`)
-            .openPopup();
+        if (!context.configured) {
+            showAlert(__('The Masternaut API is not configured yet.', 'fleetview'));
+            return;
+        }
+
+        vehiclesLayer.clearLayers();
 
         try {
-            const response = await fetch(`${PLUGIN_URL}/vehicles`);
+            const response = await fetch(`${PLUGIN_URL}/ticket/${ticketId}/vehicles`);
             const data = await response.json();
 
-            if (!data.configured) {
-                showAlert(__('The Masternaut API is not configured yet.', 'fleetview'));
+            if (data.error) {
+                showAlert(data.error, 'danger');
                 return;
             }
 
-            data.vehicles.forEach((vehicle) => {
+            const located = data.vehicles.filter((v) => v.latitude !== null && v.longitude !== null);
+
+            if (located.length === 0) {
+                showAlert(
+                    __('No vehicle found within a radius of %s km.', 'fleetview')
+                        .replace('%s', data.radius_km),
+                    'info'
+                );
+                return;
+            }
+
+            const bounds = [[latitude, longitude]];
+            located.forEach((vehicle) => {
+                const details = [
+                    `<strong>${_.escape(vehicle.label)}</strong>`,
+                    vehicle.driver_name ? `<i class="ti ti-user"></i> ${_.escape(vehicle.driver_name)}` : null,
+                    `<i class="ti ti-route"></i> ${_.escape(String(vehicle.distance_km))} km`,
+                    `<i class="ti ti-clock"></i> ${_.escape(formatDate(vehicle.updated_at))}`,
+                ].filter(Boolean).join('<br>');
+
                 L.marker([vehicle.latitude, vehicle.longitude])
-                    .addTo(map)
-                    .bindPopup(
-                        `<strong>${_.escape(vehicle.label)}</strong><br>${_.escape(vehicle.updated_at)}`
-                    );
+                    .addTo(vehiclesLayer)
+                    .bindPopup(details);
+                bounds.push([vehicle.latitude, vehicle.longitude]);
             });
+            map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 });
         } catch {
-            showAlert(__('Unable to fetch vehicle positions.', 'fleetview'));
+            showAlert(__('Unable to fetch vehicle positions.', 'fleetview'), 'danger');
         }
     };
 
-    const insertButton = (context) => {
+    const insertButton = (ticketId, context) => {
         const assignSelect = document.querySelector('select[data-actor-type="assign"]');
         if (!assignSelect || document.getElementById('fleetview-open')) {
             return;
@@ -161,7 +203,7 @@
         button.id = 'fleetview-open';
         button.className = 'btn btn-sm btn-outline-secondary mt-2';
         button.innerHTML = `<i class="ti ti-map-pin me-1"></i>${__('Nearby technicians', 'fleetview')}`;
-        button.addEventListener('click', () => openMap(context));
+        button.addEventListener('click', () => openMap(ticketId, context));
 
         const fieldContainer = assignSelect.closest('.form-field') ?? assignSelect.parentElement;
         fieldContainer.insertAdjacentElement('afterend', button);
@@ -182,7 +224,7 @@
 
             // Button only shown when the ticket location has coordinates
             if (context.available) {
-                insertButton(context);
+                insertButton(ticketId, context);
             }
         } catch {
             // Silently ignore: the plugin must never break the ticket form

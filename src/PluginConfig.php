@@ -67,11 +67,13 @@ final class PluginConfig extends CommonGLPI
     public static function getDefaults(): array
     {
         return [
-            'api_base_url'   => '',
-            'api_username'   => '',
+            'api_base_url'   => 'https://api.masternautconnect.com/connect-webservices/services/public',
+            'customer_id'    => '',    // Connect customer number, part of endpoint URLs
+            'api_username'   => '',    // Connect Partner user (HTTP Basic auth)
             'api_secret'     => '',
-            'search_radius'  => '50',  // km around the ticket location
-            'cache_lifetime' => '60',  // seconds, positions cache
+            'search_radius'  => '50',  // km around the ticket location (API max: 500)
+            'max_results'    => '10',  // maximum number of vehicles returned
+            'cache_lifetime' => '60',  // seconds, positions cache (API limit: 1 req/15s)
         ];
     }
 
@@ -96,7 +98,13 @@ final class PluginConfig extends CommonGLPI
     {
         $config = self::getConfig();
 
-        return $config['api_base_url'] !== '' && $config['api_secret'] !== '';
+        foreach (['api_base_url', 'customer_id', 'api_username', 'api_secret'] as $key) {
+            if (trim($config[$key]) === '') {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public function getTabNameForItem(CommonGLPI $item, $withtemplate = 0)

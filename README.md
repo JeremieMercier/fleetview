@@ -25,9 +25,14 @@ Puis installer/activer le plugin depuis *Configuration → Plugins*.
 
 ## Configuration
 
-*Configuration → Générale → onglet Fleetview* : URL de base, identifiant et
-secret de l'API. Le secret est chiffré en base via GLPIKey (hook
-`secured_configs`) et n'apparaît jamais dans le dépôt.
+*Configuration → Générale → onglet Fleetview* : URL de base, numéro client
+Connect, utilisateur Partner (HTTP Basic) et secret de l'API, rayon de
+recherche, nombre de véhicules et durée du cache. Le secret est chiffré en
+base via GLPIKey (hook `secured_configs`) et n'apparaît jamais dans le dépôt.
+
+L'API « Live Position Latest » est limitée à 1 requête / 15 s : les positions
+sont mises en cache côté serveur (cache GLPI, durée configurable, minimum
+15 s).
 
 La documentation PDF de l'API se place dans `docs/api/` (dossier ignoré par
 git).
@@ -37,7 +42,7 @@ git).
 - `setup.php` / `hook.php` — déclaration et cycle de vie du plugin
 - `src/PluginConfig.php` — configuration (onglet + stockage `glpi_configs`)
 - `src/Controller/MapController.php` — endpoints AJAX (contexte ticket, positions véhicules)
-- `src/Masternaut/MasternautClient.php` — client API Masternaut (à implémenter)
+- `src/Masternaut/MasternautClient.php` — client API MCF Connect (Find Nearest Vehicle + Live Position Latest, cache)
 - `js/fleetview.js` — bouton, modale et carte Leaflet
 - `templates/config.html.twig` — formulaire de configuration
 

@@ -34,6 +34,7 @@
 namespace GlpiPlugin\Fleetview\Controller;
 
 use Glpi\Controller\AbstractController;
+use GlpiPlugin\Fleetview\Masternaut\MasternautApiException;
 use GlpiPlugin\Fleetview\Masternaut\MasternautClient;
 use GlpiPlugin\Fleetview\PluginConfig;
 use Location;
@@ -61,41 +62,77 @@ final class MapController extends AbstractController
             return new JsonResponse(['error' => 'Ticket not found'], Response::HTTP_NOT_FOUND);
         }
 
-        $payload = [
-            'available'  => false,
+        return new JsonResponse([
+            'available'  => $this->getTicketLocation($ticket) !== null,
             'configured' => PluginConfig::isApiConfigured(),
-            'location'   => null,
-        ];
-
-        $location = Location::getById((int) $ticket->fields['locations_id']);
-        if ($location !== false) {
-            $latitude  = trim((string) $location->fields['latitude']);
-            $longitude = trim((string) $location->fields['longitude']);
-
-            if ($latitude !== '' && $longitude !== '' && is_numeric($latitude) && is_numeric($longitude)) {
-                $payload['available'] = true;
-                $payload['location']  = [
-                    'name'      => $location->getFriendlyName(),
-                    'latitude'  => (float) $latitude,
-                    'longitude' => (float) $longitude,
-                ];
-            }
-        }
-
-        return new JsonResponse($payload);
+            'location'   => $this->getTicketLocation($ticket),
+        ]);
     }
 
     /**
-     * Latest known positions of the fleet vehicles (technicians).
+     * Fleet vehicles near the ticket location, with live positions.
      */
-    #[Route(path: 'vehicles', name: 'vehicles', methods: ['GET'])]
-    public function vehicles(): JsonResponse
+    #[Route(path: 'ticket/{id}/vehicles', name: 'ticket_vehicles', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function ticketVehicles(int $id): JsonResponse
     {
+        $ticket = Ticket::getById($id);
+        if ($ticket === false || !$ticket->canViewItem()) {
+            return new JsonResponse(['error' => 'Ticket not found'], Response::HTTP_NOT_FOUND);
+        }
+
+        $location = $this->getTicketLocation($ticket);
+        if ($location === null) {
+            return new JsonResponse(['error' => 'Ticket has no geolocated location'], Response::HTTP_BAD_REQUEST);
+        }
+
         $client = new MasternautClient();
+        if (!$client->isConfigured()) {
+            return new JsonResponse(['configured' => false, 'vehicles' => []]);
+        }
+
+        $config = PluginConfig::getConfig();
+
+        try {
+            $vehicles = $client->getNearbyVehicles($location['latitude'], $location['longitude']);
+        } catch (MasternautApiException $e) {
+            return new JsonResponse([
+                'configured' => true,
+                'error'      => $e->getMessage(),
+                'vehicles'   => [],
+            ], Response::HTTP_BAD_GATEWAY);
+        }
 
         return new JsonResponse([
-            'configured' => $client->isConfigured(),
-            'vehicles'   => $client->getVehiclePositions(),
+            'configured' => true,
+            'radius_km'  => (float) $config['search_radius'],
+            'vehicles'   => $vehicles,
         ]);
+    }
+
+    /**
+     * Coordinates of the ticket location, or null when the ticket has no
+     * location or the location has no latitude/longitude.
+     *
+     * @return ?array{name: string, latitude: float, longitude: float}
+     */
+    private function getTicketLocation(Ticket $ticket): ?array
+    {
+        $location = Location::getById((int) $ticket->fields['locations_id']);
+        if ($location === false) {
+            return null;
+        }
+
+        $latitude  = trim((string) $location->fields['latitude']);
+        $longitude = trim((string) $location->fields['longitude']);
+
+        if ($latitude === '' || $longitude === '' || !is_numeric($latitude) || !is_numeric($longitude)) {
+            return null;
+        }
+
+        return [
+            'name'      => $location->getFriendlyName(),
+            'latitude'  => (float) $latitude,
+            'longitude' => (float) $longitude,
+        ];
     }
 }

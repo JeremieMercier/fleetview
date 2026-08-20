@@ -52,9 +52,16 @@
             ) }}
 
             {{ fields.textField(
+                'customer_id',
+                config['customer_id'],
+                __('Connect customer number', 'fleetview'),
+                {'full_width': true}
+            ) }}
+
+            {{ fields.textField(
                 'api_username',
                 config['api_username'],
-                __('API user / client ID', 'fleetview'),
+                __('API username (Connect Partner user)', 'fleetview'),
                 {'full_width': true}
             ) }}
 
@@ -64,8 +71,10 @@
                 __('API secret', 'fleetview'),
                 {
                     'full_width': true,
-                    'placeholder': __('Leave empty to keep the current secret', 'fleetview'),
-                    'additional_attributes': {'autocomplete': 'new-password'},
+                    'additional_attributes': {
+                        'autocomplete': 'new-password',
+                        'placeholder': __('Leave empty to keep the current secret', 'fleetview'),
+                    },
                 }
             ) }}
 
@@ -74,6 +83,13 @@
                 config['search_radius'],
                 __('Search radius (km)', 'fleetview'),
                 {'min': 1, 'max': 500}
+            ) }}
+
+            {{ fields.numberField(
+                'max_results',
+                config['max_results'],
+                __('Maximum number of vehicles displayed', 'fleetview'),
+                {'min': 1, 'max': 100}
             ) }}
 
             {{ fields.numberField(
