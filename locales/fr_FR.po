@@ -120,3 +120,27 @@ msgid_plural "%1 vehicles"
 msgstr[0] "%1 véhicule"
 msgstr[1] "%1 véhicules"
 msgstr[2] "%1 véhicules"
+
+#: templates/config.html.twig
+msgid "Marker color: closest vehicle"
+msgstr "Couleur du marqueur : véhicule le plus proche"
+
+#: templates/config.html.twig
+msgid "Marker color: 2nd and 3rd closest"
+msgstr "Couleur du marqueur : 2e et 3e plus proches"
+
+#: templates/config.html.twig
+msgid "Marker color: other vehicles"
+msgstr "Couleur du marqueur : autres véhicules"
+
+#: public/js/fleetview.js
+msgid "closest"
+msgstr "le plus proche"
+
+#: public/js/fleetview.js
+msgid "top 3"
+msgstr "top 3"
+
+#: public/js/fleetview.js
+msgid "others"
+msgstr "les autres"

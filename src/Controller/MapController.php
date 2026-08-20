@@ -126,9 +126,14 @@ final class MapController extends AbstractController
             ?: $a['distance_km'] <=> $b['distance_km']);
 
         return new JsonResponse([
-            'configured' => true,
-            'radius_km'  => (float) $config['search_radius'],
-            'vehicles'   => $vehicles,
+            'configured'    => true,
+            'radius_km'     => (float) $config['search_radius'],
+            'marker_colors' => [
+                'top1'   => $config['marker_color_top1'],
+                'top3'   => $config['marker_color_top3'],
+                'others' => $config['marker_color_others'],
+            ],
+            'vehicles'      => $vehicles,
         ]);
     }
 

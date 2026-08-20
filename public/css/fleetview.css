@@ -21,3 +21,12 @@
 img.fleetview-ticket-marker {
     filter: hue-rotate(150deg) saturate(1.2);
 }
+
+/* Colored dots of the proximity legend in the modal toolbar */
+.fleetview-dot {
+    display: inline-block;
+    width: 0.7em;
+    height: 0.7em;
+    border-radius: 50%;
+    vertical-align: middle;
+}

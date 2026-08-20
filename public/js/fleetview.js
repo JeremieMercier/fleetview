@@ -87,6 +87,7 @@
                                     ${__('Search radius (km)', 'fleetview')}
                                 </label>
                                 <select id="fleetview-radius" class="form-select form-select-sm w-auto"></select>
+                                <span id="fleetview-legend" class="ms-2"></span>
                                 <span id="fleetview-count" class="text-secondary ms-auto"></span>
                             </div>
                             <div id="fleetview-alert" class="alert alert-warning m-3 d-none" role="alert"></div>
@@ -156,6 +157,59 @@
         const icon = new L.Icon.Default();
         icon.options.className = 'fleetview-ticket-marker';
         return icon;
+    };
+
+    // Recolor the native blue marker (hsl(207, 66%, 48%)) to an arbitrary
+    // configured color using CSS filters, keeping the native shape.
+    const hexToHsl = (hex) => {
+        const value = hex.replace('#', '');
+        const r = parseInt(value.slice(0, 2), 16) / 255;
+        const g = parseInt(value.slice(2, 4), 16) / 255;
+        const b = parseInt(value.slice(4, 6), 16) / 255;
+        const max = Math.max(r, g, b);
+        const min = Math.min(r, g, b);
+        const l = (max + min) / 2;
+        if (max === min) {
+            return { h: 0, s: 0, l: l * 100 };
+        }
+        const d = max - min;
+        const s = d / (l > 0.5 ? 2 - max - min : max + min);
+        let h;
+        if (max === r) {
+            h = ((g - b) / d + (g < b ? 6 : 0)) * 60;
+        } else if (max === g) {
+            h = ((b - r) / d + 2) * 60;
+        } else {
+            h = ((r - g) / d + 4) * 60;
+        }
+        return { h, s: s * 100, l: l * 100 };
+    };
+
+    const markerFilter = (hex) => {
+        const base = { h: 207, s: 66, l: 48 };
+        const { h, s, l } = hexToHsl(hex);
+        return `hue-rotate(${Math.round(h - base.h)}deg)`
+            + ` saturate(${(s / base.s).toFixed(2)})`
+            + ` brightness(${(l / base.l).toFixed(2)})`;
+    };
+
+    const rankColor = (index, colors) => {
+        if (index === 0) {
+            return colors.top1;
+        }
+        return index <= 2 ? colors.top3 : colors.others;
+    };
+
+    const updateLegend = (colors) => {
+        const entries = [
+            [colors.top1, __('closest', 'fleetview')],
+            [colors.top3, __('top 3', 'fleetview')],
+            [colors.others, __('others', 'fleetview')],
+        ];
+        document.getElementById('fleetview-legend').innerHTML = entries
+            .map(([color, label]) => `<span class="ms-2 text-nowrap">`
+                + `<span class="fleetview-dot" style="background:${_.escape(color)}"></span> ${label}</span>`)
+            .join('');
     };
 
     let map = null;
@@ -236,6 +290,7 @@
             }
 
             syncRadiusSelect(data.radius_km);
+            updateLegend(data.marker_colors);
 
             const located = data.vehicles.filter((v) => v.latitude !== null && v.longitude !== null);
             count.textContent = _n('%1 vehicle', '%1 vehicles', located.length, 'fleetview', located.length);
@@ -250,7 +305,7 @@
             }
 
             const bounds = [[latitude, longitude]];
-            located.forEach((vehicle) => {
+            located.forEach((vehicle, index) => {
                 const travel = vehicle.travel_time_min !== null
                     ? __(
                         'approx. %1 drive (%2 km by road)',
@@ -268,9 +323,10 @@
                     `<i class="ti ti-clock"></i> ${_.escape(formatDate(vehicle.updated_at))}`,
                 ].filter(Boolean).join('<br>');
 
-                L.marker([vehicle.latitude, vehicle.longitude])
+                const marker = L.marker([vehicle.latitude, vehicle.longitude])
                     .addTo(vehiclesLayer)
                     .bindPopup(details);
+                marker.getElement().style.filter = markerFilter(rankColor(index, data.marker_colors));
                 bounds.push([vehicle.latitude, vehicle.longitude]);
             });
             map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 });

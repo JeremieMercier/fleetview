@@ -99,6 +99,24 @@
                 {'min': 0, 'max': 3600}
             ) }}
 
+            {{ fields.colorField(
+                'marker_color_top1',
+                config['marker_color_top1'],
+                __('Marker color: closest vehicle', 'fleetview')
+            ) }}
+
+            {{ fields.colorField(
+                'marker_color_top3',
+                config['marker_color_top3'],
+                __('Marker color: 2nd and 3rd closest', 'fleetview')
+            ) }}
+
+            {{ fields.colorField(
+                'marker_color_others',
+                config['marker_color_others'],
+                __('Marker color: other vehicles', 'fleetview')
+            ) }}
+
             {{ fields.urlField(
                 'routing_base_url',
                 config['routing_base_url'],
