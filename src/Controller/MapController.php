@@ -34,6 +34,7 @@
 namespace GlpiPlugin\Fleetview\Controller;
 
 use Glpi\Controller\AbstractController;
+use Closure;
 use CommonITILActor;
 use GlpiPlugin\Fleetview\Masternaut\MasternautApiException;
 use GlpiPlugin\Fleetview\Masternaut\MasternautClient;
@@ -60,6 +61,19 @@ use function Safe\json_decode;
  */
 final class MapController extends AbstractController
 {
+    /**
+     * The factories build the API clients from the runtime configuration
+     * (radius override included); tests inject factories returning clients
+     * with mocked HTTP transports.
+     *
+     * @param ?Closure(array<string, string>): MasternautClient $masternaut_factory
+     * @param ?Closure(string): OsrmRouter                      $osrm_factory
+     */
+    public function __construct(
+        private ?Closure $masternaut_factory = null,
+        private ?Closure $osrm_factory = null,
+    ) {}
+
     /**
      * Geographic context of a ticket: coordinates of its location, if any.
      * Used by the JS to decide whether the map button should be displayed.
@@ -104,7 +118,7 @@ final class MapController extends AbstractController
             $config['search_radius'] = (string) min(500, max(1, (int) $radius));
         }
 
-        $client = new MasternautClient($config);
+        $client = $this->buildMasternautClient($config);
         if (!$client->isConfigured()) {
             return new JsonResponse(['configured' => false, 'vehicles' => []]);
         }
@@ -121,7 +135,7 @@ final class MapController extends AbstractController
 
         // Best-effort driving time estimations; vehicles keep null values
         // when the routing service is disabled or unavailable.
-        $routes = (new OsrmRouter($config['routing_base_url']))
+        $routes = $this->buildOsrmRouter($config['routing_base_url'])
             ->getRoutesFromPoint($location['latitude'], $location['longitude'], $vehicles);
         foreach ($vehicles as $i => &$vehicle) {
             $vehicle['travel_time_min'] = $routes[$i]['duration_min'] ?? null;
@@ -144,7 +158,7 @@ final class MapController extends AbstractController
 
         // Link vehicles to GLPI users so they can be assigned from the modal:
         // explicit associations first, optional name matching as fallback.
-        $can_assign = $ticket->canAssign();
+        $can_assign = (bool) $ticket->canAssign();
         $mappings   = $can_assign ? VehicleMapping::getMap() : [];
         $matcher    = $config['name_matching_fallback'] ? new TechnicianMatcher() : null;
         foreach ($vehicles as &$vehicle) {
@@ -226,6 +240,27 @@ final class MapController extends AbstractController
             'already'   => $already,
             'user_name' => $user->getFriendlyName(),
         ]);
+    }
+
+    /**
+     * @param array<string, string> $config
+     */
+    private function buildMasternautClient(array $config): MasternautClient
+    {
+        if ($this->masternaut_factory !== null) {
+            return ($this->masternaut_factory)($config);
+        }
+
+        return new MasternautClient($config);
+    }
+
+    private function buildOsrmRouter(string $base_url): OsrmRouter
+    {
+        if ($this->osrm_factory !== null) {
+            return ($this->osrm_factory)($base_url);
+        }
+
+        return new OsrmRouter($base_url);
     }
 
     /**

@@ -34,9 +34,18 @@
 namespace GlpiPlugin\Fleetview\Tests;
 
 use CommonITILActor;
+use Config;
 use Entity;
 use Glpi\Tests\DbTestCase;
 use GlpiPlugin\Fleetview\Controller\MapController;
+use GlpiPlugin\Fleetview\Masternaut\MasternautClient;
+use GlpiPlugin\Fleetview\PluginConfig;
+use GlpiPlugin\Fleetview\Routing\OsrmRouter;
+use GlpiPlugin\Fleetview\VehicleMapping;
+use GuzzleHttp\Client;
+use GuzzleHttp\Handler\MockHandler;
+use GuzzleHttp\HandlerStack;
+use GuzzleHttp\Psr7\Response;
 use Location;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -228,5 +237,191 @@ final class MapControllerTest extends DbTestCase
         $response = (new MapController())->assignTechnician($request, $ticket->getID());
 
         $this->assertSame(403, $response->getStatusCode());
+    }
+
+    /**
+     * Store a fake, complete API configuration in the test database
+     * (unique identifiers per test: cache keys derive from them).
+     */
+    private function configurePluginApi(array $overrides = []): void
+    {
+        Config::setConfigurationValues(PluginConfig::CONTEXT, array_merge([
+            'api_base_url'     => 'https://fleet.example.test/public',
+            'customer_id'      => 'TEST_' . uniqid(),
+            'api_username'     => 'fake_api_user',
+            'api_secret'       => 'fake-secret-value',
+            'routing_base_url' => 'https://osrm.example.test/' . uniqid(),
+        ], $overrides));
+    }
+
+    /**
+     * @param list<Response> $responses
+     */
+    private static function mockedHttpClient(array $responses): Client
+    {
+        return new Client(['handler' => HandlerStack::create(new MockHandler($responses))]);
+    }
+
+    /**
+     * Controller wired with mocked Masternaut (fleet + positions) and OSRM
+     * transports. The fictional fleet: asset 201 (Dupont Jean, in
+     * circulation, ~1.6 km) and asset 202 (Martin Sophie, in maintenance,
+     * ~9 km) — OSRM makes 202 the fastest despite being the farthest.
+     *
+     * @param list<Response> $masternaut_responses
+     */
+    private function mockedController(?array $masternaut_responses = null): MapController
+    {
+        $masternaut_responses ??= [
+            new Response(200, [], json_encode(['items' => [
+                [
+                    'id'        => '201',
+                    'name'      => 'Dupont Jean',
+                    'groupName' => 'Zone Alpha',
+                    'status'    => 'IN_CIRCULATION',
+                ],
+                [
+                    'id'        => '202',
+                    'name'      => 'Martin Sophie',
+                    'groupName' => 'Zone Alpha',
+                    'status'    => 'IN_MAINTENANCE',
+                ],
+            ]])),
+            new Response(200, [], json_encode(['items' => [
+                [
+                    'assetId'   => '201',
+                    'assetName' => 'Dupont Jean',
+                    'latitude'  => 48.87,
+                    'longitude' => 2.36,
+                ],
+                [
+                    'assetId'   => '202',
+                    'assetName' => 'Martin Sophie',
+                    'latitude'  => 48.93,
+                    'longitude' => 2.40,
+                ],
+            ]])),
+        ];
+
+        $osrm_responses = [
+            new Response(200, [], json_encode([
+                'code'      => 'Ok',
+                'durations' => [[0, 1800, 600]],
+                'distances' => [[0, 12000, 9500]],
+            ])),
+        ];
+
+        return new MapController(
+            fn(array $config): MasternautClient => new MasternautClient(
+                $config,
+                self::mockedHttpClient($masternaut_responses),
+            ),
+            fn(string $base_url): OsrmRouter => new OsrmRouter(
+                $base_url,
+                self::mockedHttpClient($osrm_responses),
+            ),
+        );
+    }
+
+    public function testTicketVehiclesFullFlowWithMockedClients(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi();
+        $ticket = $this->createTicket($this->createGeoLocation()->getID());
+        VehicleMapping::save('202', 'Martin Sophie', 4242);
+
+        $payload = self::payload(
+            $this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()),
+        );
+
+        $this->assertTrue($payload['configured']);
+        $this->assertTrue($payload['can_assign']);
+        $this->assertSame(50, (int) $payload['radius_km']);
+        $this->assertSame('#2fb344', $payload['marker_colors']['top1']);
+
+        // Sorted by driving time: 202 is farther but faster
+        $this->assertSame(['202', '201'], array_column($payload['vehicles'], 'id'));
+
+        [$fastest, $other] = $payload['vehicles'];
+        $this->assertSame(10, $fastest['travel_time_min']);
+        $this->assertSame(9.5, $fastest['road_distance_km']);
+        $this->assertSame(30, $other['travel_time_min']);
+
+        // Map-specific status labels
+        $this->assertSame('In maintenance', $fastest['status_label']);
+        $this->assertSame('Available', $other['status_label']);
+
+        // Explicit association resolved; no name fallback by default
+        $this->assertSame(4242, $fastest['user_id']);
+        $this->assertNull($other['user_id']);
+    }
+
+    public function testTicketVehiclesUsesNameMatchingWhenEnabled(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi(['name_matching_fallback' => '1']);
+        $ticket = $this->createTicket($this->createGeoLocation()->getID());
+
+        $technician = new User();
+        $technician_id = $technician->add([
+            'name'      => 'fake_tech_' . uniqid(),
+            'firstname' => 'Jean',
+            'realname'  => 'Dupont',
+            'is_active' => 1,
+        ]);
+        $this->assertGreaterThan(0, $technician_id);
+
+        $payload = self::payload(
+            $this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()),
+        );
+
+        $by_id = array_column($payload['vehicles'], 'user_id', 'id');
+        $this->assertSame($technician_id, $by_id['201']);
+    }
+
+    public function testTicketVehiclesClampsTheRadiusOverride(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi();
+        $ticket = $this->createTicket($this->createGeoLocation()->getID());
+
+        $payload = self::payload(
+            $this->mockedController()->ticketVehicles(Request::create('', 'GET', ['radius' => '9999']), $ticket->getID()),
+        );
+
+        $this->assertSame(500, (int) $payload['radius_km']);
+    }
+
+    public function testTicketVehiclesReportsApiFailures(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi();
+        $ticket = $this->createTicket($this->createGeoLocation()->getID());
+
+        $response = $this->mockedController([new Response(500, [], 'boom')])
+            ->ticketVehicles(Request::create(''), $ticket->getID());
+        $payload = self::payload($response);
+
+        $this->assertSame(502, $response->getStatusCode());
+        $this->assertTrue($payload['configured']);
+        $this->assertNotSame('', $payload['error']);
+        $this->assertSame([], $payload['vehicles']);
+    }
+
+    public function testTicketVehiclesHidesAssignmentsWithoutTheRight(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi();
+        $requester_id = getItemByTypeName(User::class, 'post-only', true);
+        $ticket = $this->createTicket($this->createGeoLocation()->getID(), $requester_id);
+        VehicleMapping::save('202', 'Martin Sophie', 4242);
+
+        $this->login('post-only');
+        $payload = self::payload(
+            $this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()),
+        );
+
+        $this->assertFalse($payload['can_assign']);
+        $this->assertSame([null, null], array_column($payload['vehicles'], 'user_id'));
     }
 }
