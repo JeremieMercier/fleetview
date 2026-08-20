@@ -25,11 +25,10 @@
       <author>Jérémie Mercier</author>
    </authors>
    <versions>
-      <!-- Add as many version tag you want -->
       <version>
-         <num>0.2.12</num>
-         <!-- Add as many compatibility tag you want -->
+         <num>0.2.13</num>
          <compatibility>~11.0.0</compatibility>
+         <download_url>https://github.com/JeremieMercier/fleetview/releases/download/0.2.13/glpi-fleetview-0.2.13.tar.bz2</download_url>
       </version>
    </versions>
    <langs>

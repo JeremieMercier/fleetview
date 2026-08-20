@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1f6bc4"/>
+      <stop offset="1" stop-color="#134a8e"/>
+    </linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="url(#bg)"/>
+  <!-- route -->
+  <path d="M 48 196 C 96 168, 84 128, 128 118 C 176 108, 168 82, 204 66"
+        fill="none" stroke="#ffffff" stroke-opacity="0.45" stroke-width="10"
+        stroke-linecap="round" stroke-dasharray="1 22"/>
+  <!-- pin techniciens (vert) -->
+  <g transform="translate(48,196)">
+    <circle r="14" fill="#2fb344" stroke="#ffffff" stroke-width="6"/>
+  </g>
+  <!-- pin lieu du ticket (rouge) -->
+  <g transform="translate(160,96)">
+    <path d="M44 -60 C 20 -60, 0 -41, 0 -16 C 0 16, 44 60, 44 60 C 44 60, 88 16, 88 -16 C 88 -41, 68 -60, 44 -60 Z"
+          fill="#e5484d" stroke="#ffffff" stroke-width="8" transform="translate(-44,-6)"/>
+    <circle cx="0" cy="-22" r="16" fill="#ffffff"/>
+  </g>
+</svg>

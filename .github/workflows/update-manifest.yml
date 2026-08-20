@@ -1,0 +1,69 @@
+name: "Update plugin manifest"
+
+# Keeps fleetview.xml (the plugins.glpi-project.org manifest) in sync with
+# published releases: each new release is prepended to the <versions> list
+# with its downloadable archive URL.
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  update-manifest:
+    name: "Add release to fleetview.xml"
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: "actions/checkout@v4"
+        with:
+          ref: "main"
+
+      - name: "Insert version entry"
+        env:
+          TAG: "${{ github.event.release.tag_name }}"
+          REPOSITORY: "${{ github.repository }}"
+        run: |
+          python3 - <<'EOF'
+          import os, sys
+
+          tag = os.environ['TAG']
+          repository = os.environ['REPOSITORY']
+          path = 'fleetview.xml'
+          xml = open(path).read()
+
+          if f'<num>{tag}</num>' in xml:
+              print(f'Version {tag} already present, nothing to do.')
+              sys.exit(0)
+
+          download = (
+              f'https://github.com/{repository}/releases/download/'
+              f'{tag}/glpi-fleetview-{tag}.tar.bz2'
+          )
+          entry = (
+              '   <versions>\n'
+              '      <version>\n'
+              f'         <num>{tag}</num>\n'
+              '         <compatibility>~11.0.0</compatibility>\n'
+              f'         <download_url>{download}</download_url>\n'
+              '      </version>\n'
+          )
+
+          assert '   <versions>\n' in xml
+          xml = xml.replace('   <versions>\n', entry, 1)
+          open(path, 'w').write(xml)
+          print(f'Version {tag} added to the manifest.')
+          EOF
+
+      - name: "Commit and push"
+        run: |
+          if git diff --quiet; then
+            echo "Manifest already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add fleetview.xml
+          git commit -m "Add version ${{ github.event.release.tag_name }} to the plugin manifest [skip ci]"
+          git push
