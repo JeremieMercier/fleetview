@@ -213,7 +213,7 @@
                 const details = [
                     `<strong>${_.escape(vehicle.label)}</strong>`,
                     vehicle.driver_name ? `<i class="ti ti-user"></i> ${_.escape(vehicle.driver_name)}` : null,
-                    `<i class="ti ti-route"></i> ${_.escape(String(vehicle.distance_km))} km`,
+                    `<i class="ti ti-route"></i> ${__('%1 km as the crow flies', 'fleetview', vehicle.distance_km)}`,
                     travel ? `<i class="ti ti-car"></i> ${travel}` : null,
                     `<i class="ti ti-clock"></i> ${_.escape(formatDate(vehicle.updated_at))}`,
                 ].filter(Boolean).join('<br>');

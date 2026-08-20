@@ -113,3 +113,7 @@ msgstr ""
 #: public/js/fleetview.js
 msgid "approx. %1 drive (%2 km by road)"
 msgstr "approx. %1 drive (%2 km by road)"
+
+#: public/js/fleetview.js
+msgid "%1 km as the crow flies"
+msgstr "%1 km as the crow flies"

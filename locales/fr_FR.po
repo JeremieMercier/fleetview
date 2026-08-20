@@ -109,3 +109,7 @@ msgstr "Utilisé pour estimer les temps de route ; les coordonnées sont envoyé
 #: public/js/fleetview.js
 msgid "approx. %1 drive (%2 km by road)"
 msgstr "environ %1 de route (%2 km par la route)"
+
+#: public/js/fleetview.js
+msgid "%1 km as the crow flies"
+msgstr "%1 km à vol d'oiseau"
