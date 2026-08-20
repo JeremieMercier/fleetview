@@ -81,6 +81,30 @@
                 __('Marker color: 3rd closest', 'fleetview')
             ) }}
 
+            {{ fields.dropdownArrayField(
+                'modal_group',
+                config['modal_group'],
+                groups,
+                __('Vehicle group shown on the map', 'fleetview'),
+                {
+                    'display_emptychoice': true,
+                    'emptylabel': __('All groups', 'fleetview'),
+                    'helper': __('Only vehicles of this Masternaut group appear in the nearby technicians modal.', 'fleetview'),
+                }
+            ) }}
+
+            {{ fields.dropdownArrayField(
+                'modal_status',
+                config['modal_status'],
+                statuses,
+                __('Vehicle status shown on the map', 'fleetview'),
+                {
+                    'display_emptychoice': true,
+                    'emptylabel': __('All statuses', 'fleetview'),
+                    'helper': __('Only vehicles with this status appear in the nearby technicians modal.', 'fleetview'),
+                }
+            ) }}
+
             {{ fields.sliderField(
                 'name_matching_fallback',
                 config['name_matching_fallback'],

@@ -83,6 +83,9 @@ final class PluginConfig extends CommonGLPI
             'search_radius'  => '50',  // km around the ticket location (API max: 500)
             'max_results'    => '10',  // maximum number of vehicles returned
             'cache_lifetime' => '60',  // seconds, positions cache (API limit: 1 req/15s)
+            // Restrict the vehicles shown in the map modal; empty = no filter
+            'modal_group'  => '',      // Masternaut group name
+            'modal_status' => '',      // IN_CIRCULATION / IN_MAINTENANCE / SOLD
             // OSRM-compatible routing service for driving time estimations.
             // Coordinates are sent to this third-party service; empty = disabled.
             'routing_base_url' => 'https://router.project-osrm.org',
@@ -193,6 +196,16 @@ final class PluginConfig extends CommonGLPI
         ]);
     }
 
+    public static function getStatusLabel(string $status): string
+    {
+        return match ($status) {
+            'IN_CIRCULATION' => __('In circulation', 'fleetview'),
+            'IN_MAINTENANCE' => __('In maintenance', 'fleetview'),
+            'SOLD'           => __('Sold', 'fleetview'),
+            default          => $status,
+        };
+    }
+
     private static function showDisplayForm(): void
     {
         /** @var array $CFG_GLPI */
@@ -202,9 +215,33 @@ final class PluginConfig extends CommonGLPI
             return;
         }
 
+        $config = self::getConfig();
+
+        // Group choices for the map filter, from the fleet itself
+        $groups = [];
+        $client = new MasternautClient($config);
+        if ($client->isConfigured()) {
+            try {
+                foreach ($client->getVehicles() as $vehicle) {
+                    if ($vehicle['group'] !== '') {
+                        $groups[$vehicle['group']] = $vehicle['group'];
+                    }
+                }
+                ksort($groups);
+            } catch (MasternautApiException) {
+                // The dropdown simply stays empty when the API is unreachable
+            }
+        }
+
         TemplateRenderer::getInstance()->display('@fleetview/config_display.html.twig', [
-            'config'      => self::getConfig(),
+            'config'      => $config,
             'form_action' => $CFG_GLPI['root_doc'] . '/plugins/fleetview/config',
+            'groups'      => $groups,
+            'statuses'    => [
+                'IN_CIRCULATION' => self::getStatusLabel('IN_CIRCULATION'),
+                'IN_MAINTENANCE' => self::getStatusLabel('IN_MAINTENANCE'),
+                'SOLD'           => self::getStatusLabel('SOLD'),
+            ],
         ]);
     }
 
@@ -230,11 +267,7 @@ final class PluginConfig extends CommonGLPI
                 $matcher  = new TechnicianMatcher();
                 foreach ($client->getVehicles() as $vehicle) {
                     $users_id = $mappings[$vehicle['id']] ?? 0;
-                    $vehicle['status_label'] = match ($vehicle['status']) {
-                        'IN_CIRCULATION' => __('In circulation', 'fleetview'),
-                        'IN_MAINTENANCE' => __('In maintenance', 'fleetview'),
-                        default          => $vehicle['status'],
-                    };
+                    $vehicle['status_label'] = self::getStatusLabel($vehicle['status']);
                     $vehicles[] = $vehicle + [
                         'users_id'     => $users_id,
                         'suggested_id' => $users_id === 0 ? ($matcher->match($vehicle['name']) ?? 0) : 0,
@@ -265,6 +298,13 @@ final class PluginConfig extends CommonGLPI
         // An empty secret means "keep the current one"
         if (array_key_exists('api_secret', $input) && $input['api_secret'] === '') {
             unset($input['api_secret']);
+        }
+
+        // Dropdowns post "0" for their empty choice ("no filter")
+        foreach (['modal_group', 'modal_status'] as $key) {
+            if (($input[$key] ?? null) === '0' || ($input[$key] ?? null) === 0) {
+                $input[$key] = '';
+            }
         }
 
         return $input;

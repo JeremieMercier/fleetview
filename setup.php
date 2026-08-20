@@ -35,7 +35,7 @@ use Glpi\Plugin\Hooks;
 use GlpiPlugin\Fleetview\PluginConfig;
 
 /** @phpstan-ignore theCodingMachineSafe.function (safe to assume this isn't already defined) */
-define('PLUGIN_FLEETVIEW_VERSION', '0.2.4');
+define('PLUGIN_FLEETVIEW_VERSION', '0.2.5');
 
 // Minimal GLPI version, inclusive
 /** @phpstan-ignore theCodingMachineSafe.function (safe to assume this isn't already defined) */

@@ -100,8 +100,28 @@ final class MasternautClient
         $radius = min(500.0, max(1.0, (float) $this->config['search_radius']));
         $max    = max(1, (int) $this->config['max_results']);
 
+        // Optional fleet filters (group / status) configured for the map;
+        // vehicles missing from the fleet list are kept rather than silently
+        // hiding a technician on a data mismatch.
+        $filter_group  = trim($this->config['modal_group']);
+        $filter_status = trim($this->config['modal_status']);
+        $fleet_info    = [];
+        if ($filter_group !== '' || $filter_status !== '') {
+            foreach ($this->getVehicles() as $info) {
+                $fleet_info[$info['id']] = $info;
+            }
+        }
+
         $vehicles = [];
         foreach ($this->getLatestPositions() as $item) {
+            $info = $fleet_info[(string) ($item['assetId'] ?? '')] ?? null;
+            if (
+                ($filter_group !== '' && $info !== null && $info['group'] !== $filter_group)
+                || ($filter_status !== '' && $info !== null && $info['status'] !== $filter_status)
+            ) {
+                continue;
+            }
+
             $distance = self::haversineKm($latitude, $longitude, (float) $item['latitude'], (float) $item['longitude']);
             if ($distance > $radius) {
                 continue;
@@ -166,7 +186,7 @@ final class MasternautClient
 
     /**
      * Every vehicle of the fleet (List Vehicle endpoint), for the vehicle to
-     * user association screen. Sold vehicles are excluded. Cached 10 minutes.
+     * user association screen. Cached 10 minutes.
      *
      * @return list<array{
      *      id: string,
@@ -197,7 +217,7 @@ final class MasternautClient
 
         $vehicles = [];
         foreach ($items as $item) {
-            if (!is_array($item) || !isset($item['id']) || ($item['status'] ?? '') === 'SOLD') {
+            if (!is_array($item) || !isset($item['id'])) {
                 continue;
             }
             $vehicles[] = [

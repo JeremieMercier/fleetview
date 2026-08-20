@@ -283,3 +283,31 @@ msgstr "In circulation"
 #: src/PluginConfig.php
 msgid "In maintenance"
 msgstr "In maintenance"
+
+#: src/PluginConfig.php templates/config_mappings.html.twig
+msgid "Sold"
+msgstr "Sold"
+
+#: templates/config_display.html.twig
+msgid "Vehicle group shown on the map"
+msgstr "Vehicle group shown on the map"
+
+#: templates/config_display.html.twig
+msgid ""
+"Only vehicles of this Masternaut group appear in the nearby technicians "
+"modal."
+msgstr ""
+"Only vehicles of this Masternaut group appear in the nearby technicians "
+"modal."
+
+#: templates/config_display.html.twig
+msgid "Vehicle status shown on the map"
+msgstr "Vehicle status shown on the map"
+
+#: templates/config_display.html.twig
+msgid "Only vehicles with this status appear in the nearby technicians modal."
+msgstr "Only vehicles with this status appear in the nearby technicians modal."
+
+#: templates/config_display.html.twig
+msgid "All statuses"
+msgstr "All statuses"
