@@ -73,19 +73,21 @@ final class MasternautClient
     }
 
     /**
-     * Vehicles near a point, with their live position when available.
+     * Vehicles near a point, closest first.
      *
-     * Combines "Find Nearest Vehicle" (distances, no coordinates) with
-     * "Live Position Latest" (coordinates, driver, status). Vehicles without
-     * a live position (private journey, no recent data) keep null coordinates.
+     * Distances are computed locally (haversine) from "Live Position Latest"
+     * data instead of calling "Find Nearest Vehicle": the latter silently
+     * excludes vehicles that have not moved during the last 24 hours, which
+     * would hide parked technicians (weekends, leaves...). This also saves
+     * an API call, as positions are cached.
      *
      * @return list<array{
      *      id: string,
      *      label: string,
      *      registration: string,
      *      distance_km: float,
-     *      latitude: ?float,
-     *      longitude: ?float,
+     *      latitude: float,
+     *      longitude: float,
      *      driver_name: ?string,
      *      updated_at: ?string,
      *      event_type: ?string,
@@ -98,58 +100,41 @@ final class MasternautClient
         $radius = min(500.0, max(1.0, (float) $this->config['search_radius']));
         $max    = max(1, (int) $this->config['max_results']);
 
-        $nearest = $this->request('vehicle/nearest', [
-            'latitude'               => $latitude,
-            'longitude'              => $longitude,
-            'radius'                 => $radius,
-            'maximumResultsToReturn' => $max,
-        ]);
-
-        if (!is_array($nearest) || $nearest === []) {
-            return [];
-        }
-
-        $positions = $this->getLatestPositions();
-
         $vehicles = [];
-        foreach ($nearest as $near) {
-            if (!is_array($near)) {
+        foreach ($this->getLatestPositions() as $item) {
+            $distance = self::haversineKm($latitude, $longitude, (float) $item['latitude'], (float) $item['longitude']);
+            if ($distance > $radius) {
                 continue;
             }
 
-            $registration = (string) ($near['registration'] ?? '');
-            $name         = (string) ($near['name'] ?? '');
-
-            // "Find Nearest Vehicle" ids do not always match "Live Position
-            // Latest" assetIds: fall back on registration then name.
-            $position = $positions['id:' . ($near['id'] ?? '')]
-                ?? $positions['reg:' . $registration]
-                ?? $positions['name:' . $name]
-                ?? null;
+            $name         = (string) ($item['assetName'] ?? '');
+            $registration = (string) ($item['assetRegistration'] ?? '');
 
             $vehicles[] = [
-                'id'           => (string) ($near['id'] ?? ''),
+                'id'           => (string) ($item['assetId'] ?? ''),
                 'label'        => $name !== '' ? $name : $registration,
                 'registration' => $registration,
-                'distance_km'  => round((float) ($near['straightLineDistanceKilometers'] ?? 0), 1),
-                'latitude'     => isset($position['latitude']) ? (float) $position['latitude'] : null,
-                'longitude'    => isset($position['longitude']) ? (float) $position['longitude'] : null,
-                'driver_name'  => $position['driverName'] ?? null,
-                'updated_at'   => $position['date'] ?? null,
-                'event_type'   => $position['eventType'] ?? null,
+                'distance_km'  => round($distance, 1),
+                'latitude'     => (float) $item['latitude'],
+                'longitude'    => (float) $item['longitude'],
+                'driver_name'  => $item['driverName'] ?? null,
+                'updated_at'   => $item['date'] ?? null,
+                'event_type'   => $item['eventType'] ?? null,
             ];
         }
 
-        return $vehicles;
+        usort($vehicles, static fn(array $a, array $b) => $a['distance_km'] <=> $b['distance_km']);
+
+        return array_slice($vehicles, 0, $max);
     }
 
     /**
-     * Latest live position of every vehicle of the fleet, indexed by
-     * `id:<assetId>`, `reg:<registration>` and `name:<name>`.
+     * Latest live position of every vehicle of the fleet (only vehicles with
+     * coordinates; private journeys are excluded by the API itself).
      *
      * Cached server-side (see class docblock).
      *
-     * @return array<string, array<string, mixed>>
+     * @return list<array<string, mixed>>
      *
      * @throws MasternautApiException
      */
@@ -168,22 +153,29 @@ final class MasternautClient
         $response = $this->request('tracking/live/latest');
         $items    = is_array($response) ? ($response['items'] ?? []) : [];
 
-        $positions = [];
-        foreach ($items as $item) {
-            if (!is_array($item) || !isset($item['latitude'], $item['longitude'])) {
-                continue;
-            }
-            foreach (['id:' . ($item['assetId'] ?? ''), 'reg:' . ($item['assetRegistration'] ?? ''), 'name:' . ($item['assetName'] ?? '')] as $key) {
-                if (strlen($key) > 5) {
-                    $positions[$key] = $item;
-                }
-            }
-        }
+        $positions = array_values(array_filter(
+            $items,
+            static fn($item) => is_array($item) && isset($item['latitude'], $item['longitude'])
+        ));
 
         $lifetime = max(self::MIN_CACHE_LIFETIME, (int) $this->config['cache_lifetime']);
         $GLPI_CACHE->set($cache_key, $positions, $lifetime);
 
         return $positions;
+    }
+
+    /**
+     * Great-circle distance between two points, in kilometers.
+     */
+    private static function haversineKm(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $dlat = deg2rad($lat2 - $lat1);
+        $dlng = deg2rad($lng2 - $lng1);
+
+        $a = sin($dlat / 2) ** 2
+            + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dlng / 2) ** 2;
+
+        return 6371.0 * 2 * asin(min(1.0, sqrt($a)));
     }
 
     /**
