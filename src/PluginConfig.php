@@ -235,6 +235,17 @@ final class PluginConfig extends CommonGLPI
 
         $config = self::getConfig();
 
+        // Same radius choices as the modal selector; keep the current value
+        // selectable even if it is not part of the presets
+        $radius_choices = [25, 50, 100, 150, 200, 300, 500];
+        $radius_choices[] = (int) $config['search_radius'];
+        $radius_choices = array_unique($radius_choices);
+        sort($radius_choices);
+        $radius_choices = array_combine(
+            $radius_choices,
+            array_map(static fn(int $km) => sprintf('%d km', $km), $radius_choices)
+        );
+
         // Group choices for the map filter, from the fleet itself
         $groups = [];
         $client = new MasternautClient($config);
@@ -254,6 +265,7 @@ final class PluginConfig extends CommonGLPI
         TemplateRenderer::getInstance()->display('@fleetview/config_display.html.twig', [
             'config'            => $config,
             'form_action'       => $CFG_GLPI['root_doc'] . '/plugins/fleetview/config',
+            'radius_choices'    => $radius_choices,
             'groups'            => $groups,
             'selected_groups'   => self::decodeListValue($config['modal_group']),
             'selected_statuses' => self::decodeListValue($config['modal_status']),
