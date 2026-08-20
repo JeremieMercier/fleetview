@@ -269,10 +269,11 @@ final class PluginConfig extends CommonGLPI
             'groups'            => $groups,
             'selected_groups'   => self::decodeListValue($config['modal_group']),
             'selected_statuses' => self::decodeListValue($config['modal_status']),
+            // SOLD is deliberately not offered: the positions endpoint never
+            // returns sold vehicles, selecting it would display nothing
             'statuses'          => [
                 'IN_CIRCULATION' => self::getStatusLabel('IN_CIRCULATION'),
                 'IN_MAINTENANCE' => self::getStatusLabel('IN_MAINTENANCE'),
-                'SOLD'           => self::getStatusLabel('SOLD'),
             ],
         ]);
     }
