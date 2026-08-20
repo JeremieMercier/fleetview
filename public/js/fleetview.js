@@ -82,6 +82,13 @@
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body p-0">
+                            <div class="d-flex align-items-center gap-2 px-3 py-2 border-bottom">
+                                <label class="form-label mb-0" for="fleetview-radius">
+                                    ${__('Search radius (km)', 'fleetview')}
+                                </label>
+                                <select id="fleetview-radius" class="form-select form-select-sm w-auto"></select>
+                                <span id="fleetview-count" class="text-secondary ms-auto"></span>
+                            </div>
                             <div id="fleetview-alert" class="alert alert-warning m-3 d-none" role="alert"></div>
                             <div id="fleetview-map"></div>
                         </div>
@@ -90,7 +97,29 @@
             </div>
         `;
         document.body.appendChild(wrapper.firstElementChild);
+
+        document.getElementById('fleetview-radius').addEventListener('change', (event) => {
+            if (currentTicketId !== null) {
+                loadVehicles(currentTicketId, currentContext, Number(event.target.value));
+            }
+        });
+
         return document.getElementById('fleetview-modal');
+    };
+
+    // Radius choices offered in the modal (km); the configured radius is
+    // inserted on first load if missing.
+    const RADIUS_CHOICES = [25, 50, 100, 150, 200, 300, 500];
+
+    const syncRadiusSelect = (radiusKm) => {
+        const select = document.getElementById('fleetview-radius');
+        if (select.options.length === 0) {
+            const choices = [...new Set([...RADIUS_CHOICES, Math.round(radiusKm)])].sort((a, b) => a - b);
+            for (const km of choices) {
+                select.add(new Option(`${km} km`, km));
+            }
+        }
+        select.value = String(Math.round(radiusKm));
     };
 
     const showAlert = (message, level = 'warning') => {
@@ -131,6 +160,8 @@
 
     let map = null;
     let vehiclesLayer = null;
+    let currentTicketId = null;
+    let currentContext = null;
 
     // Leaflet cannot compute sizes/bounds while the modal is still animating:
     // resolve once the modal is fully shown.
@@ -177,18 +208,37 @@
             return;
         }
 
+        currentTicketId = ticketId;
+        currentContext = context;
+        await loadVehicles(ticketId, context);
+    };
+
+    const loadVehicles = async (ticketId, context, radius = null) => {
+        const { latitude, longitude } = context.location;
+        const count = document.getElementById('fleetview-count');
+
+        hideAlert();
         vehiclesLayer.clearLayers();
+        count.textContent = '…';
 
         try {
-            const response = await fetch(`${PLUGIN_URL}/ticket/${ticketId}/vehicles`);
+            const url = new URL(`${PLUGIN_URL}/ticket/${ticketId}/vehicles`, window.location.origin);
+            if (radius !== null) {
+                url.searchParams.set('radius', radius);
+            }
+            const response = await fetch(url);
             const data = await response.json();
 
             if (data.error) {
+                count.textContent = '';
                 showAlert(data.error, 'danger');
                 return;
             }
 
+            syncRadiusSelect(data.radius_km);
+
             const located = data.vehicles.filter((v) => v.latitude !== null && v.longitude !== null);
+            count.textContent = _n('%1 vehicle', '%1 vehicles', located.length, 'fleetview', located.length);
 
             if (located.length === 0) {
                 showAlert(
@@ -225,6 +275,7 @@
             });
             map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 });
         } catch {
+            count.textContent = '';
             showAlert(__('Unable to fetch vehicle positions.', 'fleetview'), 'danger');
         }
     };

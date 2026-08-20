@@ -40,6 +40,7 @@ use GlpiPlugin\Fleetview\PluginConfig;
 use GlpiPlugin\Fleetview\Routing\OsrmRouter;
 use Location;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Ticket;
@@ -74,7 +75,7 @@ final class MapController extends AbstractController
      * Fleet vehicles near the ticket location, with live positions.
      */
     #[Route(path: 'ticket/{id}/vehicles', name: 'ticket_vehicles', methods: ['GET'], requirements: ['id' => '\d+'])]
-    public function ticketVehicles(int $id): JsonResponse
+    public function ticketVehicles(Request $request, int $id): JsonResponse
     {
         $ticket = Ticket::getById($id);
         if ($ticket === false || !$ticket->canViewItem()) {
@@ -86,12 +87,18 @@ final class MapController extends AbstractController
             return new JsonResponse(['error' => 'Ticket has no geolocated location'], Response::HTTP_BAD_REQUEST);
         }
 
-        $client = new MasternautClient();
+        $config = PluginConfig::getConfig();
+
+        // Optional radius override from the modal selector
+        $radius = $request->query->get('radius');
+        if (is_numeric($radius)) {
+            $config['search_radius'] = (string) min(500, max(1, (int) $radius));
+        }
+
+        $client = new MasternautClient($config);
         if (!$client->isConfigured()) {
             return new JsonResponse(['configured' => false, 'vehicles' => []]);
         }
-
-        $config = PluginConfig::getConfig();
 
         try {
             $vehicles = $client->getNearbyVehicles($location['latitude'], $location['longitude']);
@@ -111,6 +118,12 @@ final class MapController extends AbstractController
             $vehicle['travel_time_min'] = $routes[$i]['duration_min'] ?? null;
             $vehicle['road_distance_km'] = $routes[$i]['distance_km'] ?? null;
         }
+        unset($vehicle);
+
+        // Closest by driving time first; vehicles without an estimation come
+        // last, ordered by straight-line distance.
+        usort($vehicles, static fn(array $a, array $b) => ($a['travel_time_min'] ?? PHP_INT_MAX) <=> ($b['travel_time_min'] ?? PHP_INT_MAX)
+            ?: $a['distance_km'] <=> $b['distance_km']);
 
         return new JsonResponse([
             'configured' => true,

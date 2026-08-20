@@ -111,3 +111,9 @@ msgstr ""
 #: public/js/fleetview.js
 msgid "%1 km as the crow flies"
 msgstr ""
+
+#: public/js/fleetview.js
+msgid "%1 vehicle"
+msgid_plural "%1 vehicles"
+msgstr[0] ""
+msgstr[1] ""

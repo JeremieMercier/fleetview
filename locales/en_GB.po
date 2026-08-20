@@ -9,6 +9,8 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Language: en_GB\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
 #: src/PluginConfig.php
 msgid "Fleetview"
@@ -117,3 +119,9 @@ msgstr "approx. %1 drive (%2 km by road)"
 #: public/js/fleetview.js
 msgid "%1 km as the crow flies"
 msgstr "%1 km as the crow flies"
+
+#: public/js/fleetview.js
+msgid "%1 vehicle"
+msgid_plural "%1 vehicles"
+msgstr[0] "%1 vehicle"
+msgstr[1] "%1 vehicles"
