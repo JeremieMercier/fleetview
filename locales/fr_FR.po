@@ -228,3 +228,35 @@ msgstr "La configuration a été enregistrée."
 #: src/PluginConfig.php templates/config_display.html.twig
 msgid "Customization"
 msgstr "Personnalisation"
+
+#: templates/config_mappings.html.twig
+msgid "Make / model"
+msgstr "Marque / modèle"
+
+#: templates/config_mappings.html.twig
+msgid "Filter…"
+msgstr "Filtrer…"
+
+#: templates/config_mappings.html.twig
+msgid "All groups"
+msgstr "Tous les groupes"
+
+#: templates/config_mappings.html.twig
+msgid "All types"
+msgstr "Tous les types"
+
+#: templates/config_mappings.html.twig
+msgid "All"
+msgstr "Tous"
+
+#: templates/config_mappings.html.twig
+msgid "Associated"
+msgstr "Associé"
+
+#: templates/config_mappings.html.twig
+msgid "Suggestion"
+msgstr "Suggestion"
+
+#: templates/config_mappings.html.twig
+msgid "Not associated"
+msgstr "Non associé"

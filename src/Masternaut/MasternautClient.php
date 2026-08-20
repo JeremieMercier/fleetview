@@ -166,9 +166,16 @@ final class MasternautClient
 
     /**
      * Every vehicle of the fleet (List Vehicle endpoint), for the vehicle to
-     * user association screen. Cached 10 minutes.
+     * user association screen. Sold vehicles are excluded. Cached 10 minutes.
      *
-     * @return list<array{id: string, name: string, registration: string}>
+     * @return list<array{
+     *      id: string,
+     *      name: string,
+     *      registration: string,
+     *      group: string,
+     *      type: string,
+     *      make_model: string,
+     * }>
      *
      * @throws MasternautApiException
      */
@@ -189,15 +196,20 @@ final class MasternautClient
 
         $vehicles = [];
         foreach ($items as $item) {
-            if (!is_array($item) || !isset($item['id'])) {
+            if (!is_array($item) || !isset($item['id']) || ($item['status'] ?? '') === 'SOLD') {
                 continue;
             }
             $vehicles[] = [
                 'id'           => (string) $item['id'],
                 'name'         => (string) ($item['name'] ?? ''),
                 'registration' => (string) ($item['registration'] ?? ''),
+                'group'        => (string) ($item['groupName'] ?? ''),
+                'type'         => (string) ($item['type'] ?? ''),
+                'make_model'   => trim(((string) ($item['make'] ?? '')) . ' ' . ((string) ($item['model'] ?? ''))),
             ];
         }
+
+        usort($vehicles, static fn(array $a, array $b) => strnatcasecmp($a['name'], $b['name']));
 
         $GLPI_CACHE->set($cache_key, $vehicles, 600);
 

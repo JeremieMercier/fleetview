@@ -225,3 +225,35 @@ msgstr ""
 #: src/PluginConfig.php templates/config_display.html.twig
 msgid "Customization"
 msgstr ""
+
+#: templates/config_mappings.html.twig
+msgid "Make / model"
+msgstr ""
+
+#: templates/config_mappings.html.twig
+msgid "Filter…"
+msgstr ""
+
+#: templates/config_mappings.html.twig
+msgid "All groups"
+msgstr ""
+
+#: templates/config_mappings.html.twig
+msgid "All types"
+msgstr ""
+
+#: templates/config_mappings.html.twig
+msgid "All"
+msgstr ""
+
+#: templates/config_mappings.html.twig
+msgid "Associated"
+msgstr ""
+
+#: templates/config_mappings.html.twig
+msgid "Suggestion"
+msgstr ""
+
+#: templates/config_mappings.html.twig
+msgid "Not associated"
+msgstr ""

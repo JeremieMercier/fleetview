@@ -30,15 +30,17 @@
  #}
 
 {% import 'components/form/fields_macros.html.twig' as fields %}
+
 <form method="post" action="{{ mappings_action }}">
     <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token() }}" />
 
     <div class="card">
-        <div class="card-header">
-            <h3 class="card-title">
+        <div class="card-header d-flex align-items-center">
+            <h3 class="card-title mb-0">
                 <i class="ti ti-car me-2"></i>
                 {{ __('Vehicle to technician associations', 'fleetview') }}
             </h3>
+            <span id="fleetview-filter-count" class="badge bg-secondary-lt ms-auto"></span>
         </div>
         <div class="card-body">
             {% if vehicles_error is not null %}
@@ -52,19 +54,53 @@
                     {{ __('Associate each Masternaut vehicle with a GLPI user. Rows marked "suggestion" are pre-filled from name matching: save to confirm them.', 'fleetview') }}
                 </p>
                 <div class="table-responsive">
-                    <table class="table table-sm table-striped align-middle">
+                    <table class="table table-sm table-striped align-middle" id="fleetview-mappings-table">
                         <thead>
                             <tr>
-                                <th>{{ __('Vehicle', 'fleetview') }}</th>
-                                <th>{{ __('Registration', 'fleetview') }}</th>
-                                <th class="w-50">{{ 'User'|itemtype_name }}</th>
+                                <th role="button" data-sort="name">{{ __('Vehicle', 'fleetview') }} <i class="ti"></i></th>
+                                <th role="button" data-sort="registration">{{ __('Registration', 'fleetview') }} <i class="ti"></i></th>
+                                <th role="button" data-sort="group">{{ __('Group') }} <i class="ti"></i></th>
+                                <th role="button" data-sort="type">{{ __('Type') }} <i class="ti"></i></th>
+                                <th role="button" data-sort="makemodel">{{ __('Make / model', 'fleetview') }} <i class="ti"></i></th>
+                                <th role="button" data-sort="state" class="w-33">{{ 'User'|itemtype_name }} <i class="ti"></i></th>
+                            </tr>
+                            <tr>
+                                <th><input type="text" class="form-control form-control-sm" data-filter="name" placeholder="{{ __('Filter…', 'fleetview') }}"></th>
+                                <th><input type="text" class="form-control form-control-sm" data-filter="registration" placeholder="{{ __('Filter…', 'fleetview') }}"></th>
+                                <th>
+                                    <select class="form-select form-select-sm" data-filter-select="group">
+                                        <option value="">{{ __('All groups', 'fleetview') }}</option>
+                                    </select>
+                                </th>
+                                <th>
+                                    <select class="form-select form-select-sm" data-filter-select="type">
+                                        <option value="">{{ __('All types', 'fleetview') }}</option>
+                                    </select>
+                                </th>
+                                <th><input type="text" class="form-control form-control-sm" data-filter="makemodel" placeholder="{{ __('Filter…', 'fleetview') }}"></th>
+                                <th>
+                                    <select class="form-select form-select-sm" data-filter-select="state">
+                                        <option value="">{{ __('All', 'fleetview') }}</option>
+                                        <option value="mapped">{{ __('Associated', 'fleetview') }}</option>
+                                        <option value="suggested">{{ __('Suggestion', 'fleetview') }}</option>
+                                        <option value="none">{{ __('Not associated', 'fleetview') }}</option>
+                                    </select>
+                                </th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for vehicle in vehicles %}
-                                <tr>
+                                <tr data-name="{{ vehicle.name }}"
+                                    data-registration="{{ vehicle.registration }}"
+                                    data-group="{{ vehicle.group }}"
+                                    data-type="{{ vehicle.type }}"
+                                    data-makemodel="{{ vehicle.make_model }}"
+                                    data-state="{{ vehicle.users_id > 0 ? 'mapped' : (vehicle.suggested_id > 0 ? 'suggested' : 'none') }}">
                                     <td>{{ vehicle.name }}</td>
                                     <td>{{ vehicle.registration }}</td>
+                                    <td>{{ vehicle.group }}</td>
+                                    <td>{{ vehicle.type }}</td>
+                                    <td>{{ vehicle.make_model }}</td>
                                     <td>
                                         <input type="hidden" name="labels[{{ vehicle.id }}]" value="{{ vehicle.name }}" />
                                         {% do call('User::dropdown', [{
@@ -83,6 +119,62 @@
                         </tbody>
                     </table>
                 </div>
+
+                <script>
+                (() => {
+                    const table = document.getElementById('fleetview-mappings-table');
+                    const tbody = table.querySelector('tbody');
+                    const rows  = () => [...tbody.querySelectorAll('tr')];
+                    const count = document.getElementById('fleetview-filter-count');
+
+                    // Feed the group/type filter dropdowns with existing values
+                    for (const key of ['group', 'type']) {
+                        const select = table.querySelector(`[data-filter-select="${key}"]`);
+                        const values = [...new Set(rows().map((r) => r.dataset[key]).filter(Boolean))]
+                            .sort((a, b) => a.localeCompare(b));
+                        for (const value of values) {
+                            select.add(new Option(value, value));
+                        }
+                    }
+
+                    const applyFilters = () => {
+                        const texts = [...table.querySelectorAll('[data-filter]')]
+                            .map((i) => [i.dataset.filter, i.value.trim().toLowerCase()]);
+                        const selects = [...table.querySelectorAll('[data-filter-select]')]
+                            .map((s) => [s.dataset.filterSelect, s.value]);
+
+                        let visible = 0;
+                        for (const row of rows()) {
+                            const matches = texts.every(([key, value]) => value === '' || row.dataset[key].toLowerCase().includes(value))
+                                && selects.every(([key, value]) => value === '' || row.dataset[key] === value);
+                            row.classList.toggle('d-none', !matches);
+                            visible += matches ? 1 : 0;
+                        }
+                        count.textContent = `${visible} / ${rows().length}`;
+                    };
+
+                    table.querySelectorAll('[data-filter]').forEach((i) => i.addEventListener('input', applyFilters));
+                    table.querySelectorAll('[data-filter-select]').forEach((s) => s.addEventListener('change', applyFilters));
+
+                    // Click on a header to sort (toggles asc/desc)
+                    let sortKey = null;
+                    let sortAsc = true;
+                    table.querySelectorAll('th[data-sort]').forEach((th) => th.addEventListener('click', () => {
+                        const key = th.dataset.sort;
+                        sortAsc = sortKey === key ? !sortAsc : true;
+                        sortKey = key;
+
+                        table.querySelectorAll('th[data-sort] i.ti').forEach((i) => { i.className = 'ti'; });
+                        th.querySelector('i.ti').className = sortAsc ? 'ti ti-sort-ascending' : 'ti ti-sort-descending';
+
+                        rows()
+                            .sort((a, b) => a.dataset[key].localeCompare(b.dataset[key], undefined, { numeric: true, sensitivity: 'base' }) * (sortAsc ? 1 : -1))
+                            .forEach((row) => tbody.appendChild(row));
+                    }));
+
+                    applyFilters();
+                })();
+                </script>
             {% endif %}
         </div>
         {% if vehicles is not empty %}
