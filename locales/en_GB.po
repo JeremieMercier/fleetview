@@ -1,0 +1,99 @@
+# Fleetview plugin for GLPI — translation template.
+# Copyright (C) 2026 by the Fleetview plugin team.
+# This file is distributed under the same license as the Fleetview package.
+msgid ""
+msgstr ""
+"Project-Id-Version: Fleetview 0.1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-08-20 17:00+0200\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: src/PluginConfig.php
+msgid "Fleetview"
+msgstr "Fleetview"
+
+#: src/Masternaut/MasternautClient.php
+msgid "The Masternaut API is not configured."
+msgstr "The Masternaut API is not configured."
+
+#: src/Masternaut/MasternautClient.php
+msgid "Unable to reach the Masternaut API."
+msgstr "Unable to reach the Masternaut API."
+
+#: src/Masternaut/MasternautClient.php
+msgid "Masternaut API rate limit exceeded, please retry in a few seconds."
+msgstr "Masternaut API rate limit exceeded, please retry in a few seconds."
+
+#: src/Masternaut/MasternautClient.php
+msgid ""
+"Masternaut API authentication failed, please check the plugin configuration."
+msgstr ""
+"Masternaut API authentication failed, please check the plugin configuration."
+
+#: src/Masternaut/MasternautClient.php
+#, php-format
+msgid "Masternaut API error (HTTP %1$d): %2$s"
+msgstr "Masternaut API error (HTTP %1$d): %2$s"
+
+#: src/Masternaut/MasternautClient.php
+msgid "unknown error"
+msgstr "unknown error"
+
+#: templates/config.html.twig
+msgid "Masternaut (Michelin Connected Fleet) API"
+msgstr "Masternaut (Michelin Connected Fleet) API"
+
+#: templates/config.html.twig
+msgid "API base URL"
+msgstr "API base URL"
+
+#: templates/config.html.twig
+msgid "Connect customer number"
+msgstr "Connect customer number"
+
+#: templates/config.html.twig
+msgid "API username (Connect Partner user)"
+msgstr "API username (Connect Partner user)"
+
+#: templates/config.html.twig
+msgid "API secret"
+msgstr "API secret"
+
+#: templates/config.html.twig
+msgid "Leave empty to keep the current secret"
+msgstr "Leave empty to keep the current secret"
+
+#: templates/config.html.twig
+msgid "Search radius (km)"
+msgstr "Search radius (km)"
+
+#: templates/config.html.twig
+msgid "Maximum number of vehicles displayed"
+msgstr "Maximum number of vehicles displayed"
+
+#: templates/config.html.twig
+msgid "Positions cache lifetime (seconds)"
+msgstr "Positions cache lifetime (seconds)"
+
+#: public/js/fleetview.js
+msgid "Nearby technicians"
+msgstr "Nearby technicians"
+
+#: public/js/fleetview.js
+msgid "Unable to load the map library."
+msgstr "Unable to load the map library."
+
+#: public/js/fleetview.js
+msgid "The Masternaut API is not configured yet."
+msgstr "The Masternaut API is not configured yet."
+
+#: public/js/fleetview.js
+#, php-format
+msgid "No vehicle found within a radius of %s km."
+msgstr "No vehicle found within a radius of %s km."
+
+#: public/js/fleetview.js
+msgid "Unable to fetch vehicle positions."
+msgstr "Unable to fetch vehicle positions."

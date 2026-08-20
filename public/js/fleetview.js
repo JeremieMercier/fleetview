@@ -112,20 +112,14 @@
         return Number.isNaN(date.getTime()) ? utcDate : date.toLocaleString();
     };
 
-    // Red pin for the ticket location, so it stands out from the default
-    // blue Leaflet markers used for the technicians' vehicles.
-    const ticketIcon = () => L.divIcon({
-        className: 'fleetview-ticket-icon',
-        html: `
-            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42">
-                <path d="M16 1C7.7 1 1 7.6 1 15.7 1 26.8 16 41 16 41s15-14.2 15-25.3C31 7.6 24.3 1 16 1z"
-                      fill="#d63939" stroke="#8f2424" stroke-width="1.5"/>
-                <circle cx="16" cy="15.5" r="5.5" fill="#fff"/>
-            </svg>`,
-        iconSize: [32, 42],
-        iconAnchor: [16, 41],
-        popupAnchor: [0, -36],
-    });
+    // Native Leaflet marker for the ticket location, recolored to red with a
+    // CSS hue-rotate filter (see fleetview.css) so it stays visually
+    // consistent with the default blue vehicle markers.
+    const ticketIcon = () => {
+        const icon = new L.Icon.Default();
+        icon.options.className = 'fleetview-ticket-marker';
+        return icon;
+    };
 
     let map = null;
     let vehiclesLayer = null;

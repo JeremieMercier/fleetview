@@ -16,8 +16,8 @@
     border-bottom-right-radius: var(--tblr-border-radius, 4px);
 }
 
-/* Leaflet divIcon comes with a white square background by default */
-.fleetview-ticket-icon {
-    background: transparent;
-    border: none;
+/* Native Leaflet marker recolored from blue (hue ≈ 207°) to red; the class
+   is also set on the shadow image, which hue-rotate leaves visually intact */
+img.fleetview-ticket-marker {
+    filter: hue-rotate(150deg) saturate(1.2);
 }
