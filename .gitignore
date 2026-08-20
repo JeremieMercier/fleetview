@@ -8,8 +8,7 @@ var
 /.idea/
 
 # Proprietary API documentation (Masternaut / Michelin Connected Fleet)
-/docs/api/*
-!/docs/api/README.md
+/docs/api/
 
 # Secrets — never commit credentials
 .env
