@@ -15,3 +15,9 @@
     border-bottom-left-radius: var(--tblr-border-radius, 4px);
     border-bottom-right-radius: var(--tblr-border-radius, 4px);
 }
+
+/* Leaflet divIcon comes with a white square background by default */
+.fleetview-ticket-icon {
+    background: transparent;
+    border: none;
+}

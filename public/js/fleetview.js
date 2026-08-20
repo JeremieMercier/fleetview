@@ -112,8 +112,33 @@
         return Number.isNaN(date.getTime()) ? utcDate : date.toLocaleString();
     };
 
+    // Red pin for the ticket location, so it stands out from the default
+    // blue Leaflet markers used for the technicians' vehicles.
+    const ticketIcon = () => L.divIcon({
+        className: 'fleetview-ticket-icon',
+        html: `
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 32 42">
+                <path d="M16 1C7.7 1 1 7.6 1 15.7 1 26.8 16 41 16 41s15-14.2 15-25.3C31 7.6 24.3 1 16 1z"
+                      fill="#d63939" stroke="#8f2424" stroke-width="1.5"/>
+                <circle cx="16" cy="15.5" r="5.5" fill="#fff"/>
+            </svg>`,
+        iconSize: [32, 42],
+        iconAnchor: [16, 41],
+        popupAnchor: [0, -36],
+    });
+
     let map = null;
     let vehiclesLayer = null;
+
+    // Leaflet cannot compute sizes/bounds while the modal is still animating:
+    // resolve once the modal is fully shown.
+    const waitModalShown = (modalEl) => new Promise((resolve) => {
+        if (modalEl.classList.contains('show')) {
+            resolve();
+            return;
+        }
+        modalEl.addEventListener('shown.bs.modal', () => resolve(), { once: true });
+    });
 
     const openMap = async (ticketId, context) => {
         const modalEl = document.getElementById('fleetview-modal') ?? buildModal();
@@ -136,14 +161,14 @@
             }).addTo(map);
             vehiclesLayer = L.layerGroup().addTo(map);
 
-            L.marker([latitude, longitude])
+            L.marker([latitude, longitude], { icon: ticketIcon(), zIndexOffset: 1000 })
                 .addTo(map)
                 .bindPopup(`<strong>${_.escape(name)}</strong>`);
         }
-        map.setView([latitude, longitude], 11);
 
-        // The modal animation breaks Leaflet's size computation
-        setTimeout(() => map.invalidateSize(), 300);
+        await waitModalShown(modalEl);
+        map.invalidateSize();
+        map.setView([latitude, longitude], 11);
 
         if (!context.configured) {
             showAlert(__('The Masternaut API is not configured yet.', 'fleetview'));
