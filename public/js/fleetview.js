@@ -192,8 +192,30 @@
         }
     };
 
-    const insertButton = (ticketId, context) => {
-        const assignSelect = document.querySelector('select[data-actor-type="assign"]');
+    // Parts of the ticket form are rendered after DOMContentLoaded: wait for
+    // the element to show up instead of assuming it is already there.
+    const waitForElement = (selector, timeout = 15000) => new Promise((resolve) => {
+        const existing = document.querySelector(selector);
+        if (existing) {
+            resolve(existing);
+            return;
+        }
+        const observer = new MutationObserver(() => {
+            const element = document.querySelector(selector);
+            if (element) {
+                observer.disconnect();
+                resolve(element);
+            }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+        setTimeout(() => {
+            observer.disconnect();
+            resolve(null);
+        }, timeout);
+    });
+
+    const insertButton = async (ticketId, context) => {
+        const assignSelect = await waitForElement('select[data-actor-type="assign"]');
         if (!assignSelect || document.getElementById('fleetview-open')) {
             return;
         }
