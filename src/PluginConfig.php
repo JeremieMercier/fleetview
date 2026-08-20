@@ -138,10 +138,21 @@ final class PluginConfig extends CommonGLPI
         return true;
     }
 
+    public function defineTabs($options = [])
+    {
+        $ong = [];
+        $this->addStandardTab(self::class, $ong, $options);
+
+        return $ong;
+    }
+
     public function getTabNameForItem(CommonGLPI $item, $withtemplate = 0)
     {
-        if ($item instanceof Config) {
-            return self::createTabEntry(self::getTypeName(), 0, $item::class, self::getIcon());
+        if ($item instanceof self) {
+            return [
+                1 => self::createTabEntry(__('API', 'fleetview'), 0, $item::class, 'ti ti-plug'),
+                2 => self::createTabEntry(__('Vehicle to technician associations', 'fleetview'), 0, $item::class, 'ti ti-car'),
+            ];
         }
 
         return '';
@@ -149,15 +160,38 @@ final class PluginConfig extends CommonGLPI
 
     public static function displayTabContentForItem(CommonGLPI $item, $tabnum = 1, $withtemplate = 0)
     {
-        if ($item instanceof Config) {
-            self::showConfigForm();
+        if ($item instanceof self) {
+            match ((int) $tabnum) {
+                2       => self::showMappingsForm(),
+                default => self::showApiForm(),
+            };
             return true;
         }
 
         return false;
     }
 
-    private static function showConfigForm(): void
+    private static function showApiForm(): void
+    {
+        /** @var array $CFG_GLPI */
+        global $CFG_GLPI;
+
+        if (!Session::haveRight(self::$rightname, UPDATE)) {
+            return;
+        }
+
+        $config = self::getConfig();
+
+        // Never expose the stored secret in the page source
+        $config['api_secret'] = '';
+
+        TemplateRenderer::getInstance()->display('@fleetview/config_api.html.twig', [
+            'config'      => $config,
+            'form_action' => $CFG_GLPI['root_doc'] . '/plugins/fleetview/config',
+        ]);
+    }
+
+    private static function showMappingsForm(): void
     {
         /** @var array $CFG_GLPI */
         global $CFG_GLPI;
@@ -189,12 +223,7 @@ final class PluginConfig extends CommonGLPI
             }
         }
 
-        // Never expose the stored secret in the page source
-        $config['api_secret'] = '';
-
-        TemplateRenderer::getInstance()->display('@fleetview/config.html.twig', [
-            'config'          => $config,
-            'form_action'     => Config::getFormURL(),
+        TemplateRenderer::getInstance()->display('@fleetview/config_mappings.html.twig', [
             'vehicles'        => $vehicles,
             'vehicles_error'  => $vehicles_error,
             'mappings_action' => $CFG_GLPI['root_doc'] . '/plugins/fleetview/mappings',

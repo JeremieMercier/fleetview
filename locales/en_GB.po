@@ -193,18 +193,20 @@ msgstr "Match technicians by name when a vehicle has no association"
 #: templates/config.html.twig
 msgid ""
 "Only useful when vehicles are named after their technician. Explicit "
-"associations below always take precedence."
+"associations always take precedence."
 msgstr ""
 "Only useful when vehicles are named after their technician. Explicit "
-"associations below always take precedence."
+"associations always take precedence."
 
 #: templates/config.html.twig
 msgid "Vehicle to technician associations"
 msgstr "Vehicle to technician associations"
 
 #: templates/config.html.twig
-msgid "Configure and save the API access above to list the fleet vehicles."
-msgstr "Configure and save the API access above to list the fleet vehicles."
+msgid ""
+"Configure and save the API access in the API tab to list the fleet vehicles."
+msgstr ""
+"Configure and save the API access in the API tab to list the fleet vehicles."
 
 #: templates/config.html.twig
 msgid ""
@@ -229,3 +231,11 @@ msgstr "suggestion"
 #: src/Controller/MappingController.php
 msgid "Vehicle associations have been saved."
 msgstr "Vehicle associations have been saved."
+
+#: src/PluginConfig.php
+msgid "API"
+msgstr "API"
+
+#: src/Controller/ConfigController.php
+msgid "Configuration has been saved."
+msgstr "Configuration has been saved."

@@ -186,16 +186,16 @@ msgid "Match technicians by name when a vehicle has no association"
 msgstr "Faire correspondre les techniciens par nom quand un véhicule n'a pas d'association"
 
 #: templates/config.html.twig
-msgid "Only useful when vehicles are named after their technician. Explicit associations below always take precedence."
-msgstr "Utile uniquement si les véhicules portent le nom de leur technicien. Les associations explicites ci-dessous sont toujours prioritaires."
+msgid "Only useful when vehicles are named after their technician. Explicit associations always take precedence."
+msgstr "Utile uniquement si les véhicules portent le nom de leur technicien. Les associations explicites sont toujours prioritaires."
 
 #: templates/config.html.twig
 msgid "Vehicle to technician associations"
 msgstr "Associations véhicules / techniciens"
 
 #: templates/config.html.twig
-msgid "Configure and save the API access above to list the fleet vehicles."
-msgstr "Configurez et enregistrez l'accès API ci-dessus pour lister les véhicules de la flotte."
+msgid "Configure and save the API access in the API tab to list the fleet vehicles."
+msgstr "Configurez et enregistrez l'accès API dans l'onglet API pour lister les véhicules de la flotte."
 
 #: templates/config.html.twig
 msgid "Associate each Masternaut vehicle with a GLPI user. Rows marked \"suggestion\" are pre-filled from name matching: save to confirm them."
@@ -216,3 +216,11 @@ msgstr "suggestion"
 #: src/Controller/MappingController.php
 msgid "Vehicle associations have been saved."
 msgstr "Les associations de véhicules ont été enregistrées."
+
+#: src/PluginConfig.php
+msgid "API"
+msgstr "API"
+
+#: src/Controller/ConfigController.php
+msgid "Configuration has been saved."
+msgstr "La configuration a été enregistrée."

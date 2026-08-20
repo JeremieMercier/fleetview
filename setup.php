@@ -35,7 +35,7 @@ use Glpi\Plugin\Hooks;
 use GlpiPlugin\Fleetview\PluginConfig;
 
 /** @phpstan-ignore theCodingMachineSafe.function (safe to assume this isn't already defined) */
-define('PLUGIN_FLEETVIEW_VERSION', '0.2.0');
+define('PLUGIN_FLEETVIEW_VERSION', '0.2.1');
 
 // Minimal GLPI version, inclusive
 /** @phpstan-ignore theCodingMachineSafe.function (safe to assume this isn't already defined) */
@@ -63,8 +63,8 @@ function plugin_init_fleetview(): void
         return;
     }
 
-    // Configuration tab on core "Setup > General" page
-    Plugin::registerClass(PluginConfig::class, ['addtabon' => 'Config']);
+    // Dedicated configuration page (wrench icon on the plugin card)
+    $PLUGIN_HOOKS[Hooks::CONFIG_PAGE]['fleetview'] = 'front/config.form.php';
 
     // Ticket form integration (button + map modal); the JS guards itself so it
     // only acts on the ticket form.
