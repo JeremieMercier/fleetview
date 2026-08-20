@@ -35,7 +35,10 @@ namespace GlpiPlugin\Fleetview\Routing;
 
 use GuzzleHttp\Exception\GuzzleException;
 use Psr\SimpleCache\CacheInterface;
+use Safe\Exceptions\JsonException;
 use Toolbox;
+
+use function Safe\json_decode;
 
 /**
  * Driving time/distance estimations using an OSRM "table" service
@@ -83,8 +86,8 @@ final class OsrmRouter
 
         $cache_key = 'fleetview_osrm_' . md5($this->base_url . $coordinates);
         $cached    = $GLPI_CACHE->get($cache_key);
-        if (is_array($cached)) {
-            return $cached;
+        if (is_array($cached) && count($cached) === count($destinations)) {
+            return $this->sanitizeRoutes($cached);
         }
 
         $url = sprintf('%s/table/v1/driving/%s', $this->base_url, $coordinates);
@@ -97,35 +100,67 @@ final class OsrmRouter
                 ],
                 'http_errors' => false,
             ]);
-        } catch (GuzzleException $e) {
-            Toolbox::logInFile('fleetview', sprintf("OSRM request failed: %s\n", $e->getMessage()));
+        } catch (GuzzleException $guzzleException) {
+            Toolbox::logInFile('fleetview', sprintf("OSRM request failed: %s\n", $guzzleException->getMessage()));
             return $none;
         }
 
-        $data = json_decode((string) $response->getBody(), true);
+        try {
+            $data = json_decode((string) $response->getBody(), true);
+        } catch (JsonException) {
+            $data = null;
+        }
+
         if ($response->getStatusCode() !== 200 || !is_array($data) || ($data['code'] ?? '') !== 'Ok') {
+            $code = is_array($data) && is_scalar($data['code'] ?? null) ? (string) $data['code'] : 'unparsable';
             Toolbox::logInFile('fleetview', sprintf(
                 "OSRM returned HTTP %d (code: %s)\n",
                 $response->getStatusCode(),
-                is_array($data) ? ($data['code'] ?? '?') : 'unparsable'
+                $code,
             ));
             return $none;
         }
 
+        $durations = is_array($data['durations'] ?? null) && is_array($data['durations'][0] ?? null)
+            ? $data['durations'][0]
+            : [];
+        $distances = is_array($data['distances'] ?? null) && is_array($data['distances'][0] ?? null)
+            ? $data['distances'][0]
+            : [];
+
         $routes = [];
         foreach (array_keys($destinations) as $i) {
-            $duration = $data['durations'][0][$i + 1] ?? null;
-            $distance = $data['distances'][0][$i + 1] ?? null;
+            $duration = $durations[$i + 1] ?? null;
+            $distance = $distances[$i + 1] ?? null;
 
             $routes[] = is_numeric($duration) && is_numeric($distance)
                 ? [
-                    'duration_min' => (int) round($duration / 60),
-                    'distance_km'  => round($distance / 1000, 1),
+                    'duration_min' => (int) round((float) $duration / 60),
+                    'distance_km'  => round((float) $distance / 1000, 1),
                 ]
                 : null;
         }
 
         $GLPI_CACHE->set($cache_key, $routes, self::CACHE_LIFETIME);
+
+        return $routes;
+    }
+
+    /**
+     * Re-validate route entries coming from the cache.
+     *
+     * @param array<array-key, mixed> $entries
+     *
+     * @return list<?array{duration_min: int, distance_km: float}>
+     */
+    private function sanitizeRoutes(array $entries): array
+    {
+        $routes = [];
+        foreach ($entries as $entry) {
+            $routes[] = is_array($entry) && is_int($entry['duration_min'] ?? null) && is_float($entry['distance_km'] ?? null)
+                ? ['duration_min' => $entry['duration_min'], 'distance_km' => $entry['distance_km']]
+                : null;
+        }
 
         return $routes;
     }

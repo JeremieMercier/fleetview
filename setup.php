@@ -35,7 +35,7 @@ use Glpi\Plugin\Hooks;
 use GlpiPlugin\Fleetview\PluginConfig;
 
 /** @phpstan-ignore theCodingMachineSafe.function (safe to assume this isn't already defined) */
-define('PLUGIN_FLEETVIEW_VERSION', '0.2.10');
+define('PLUGIN_FLEETVIEW_VERSION', '0.2.11');
 
 // Minimal GLPI version, inclusive
 /** @phpstan-ignore theCodingMachineSafe.function (safe to assume this isn't already defined) */
@@ -51,10 +51,8 @@ define("PLUGIN_FLEETVIEW_MAX_GLPI_VERSION", "11.0.99");
  */
 function plugin_init_fleetview(): void
 {
-    /** @var array $PLUGIN_HOOKS */
+    /** @var array<string, array<string, mixed>> $PLUGIN_HOOKS */
     global $PLUGIN_HOOKS;
-
-    $PLUGIN_HOOKS[Hooks::CSRF_COMPLIANT]['fleetview'] = true;
 
     // API credentials are encrypted with GLPIKey in the `glpi_configs` table
     $PLUGIN_HOOKS[Hooks::SECURED_CONFIGS]['fleetview'] = PluginConfig::SECURED;
@@ -68,8 +66,8 @@ function plugin_init_fleetview(): void
 
     // Ticket form integration (button + map modal); the JS guards itself so it
     // only acts on the ticket form.
-    $PLUGIN_HOOKS[Hooks::ADD_JAVASCRIPT]['fleetview'][] = 'js/fleetview.js';
-    $PLUGIN_HOOKS[Hooks::ADD_CSS]['fleetview'][]        = 'css/fleetview.css';
+    $PLUGIN_HOOKS[Hooks::ADD_JAVASCRIPT]['fleetview'] = ['js/fleetview.js'];
+    $PLUGIN_HOOKS[Hooks::ADD_CSS]['fleetview']        = ['css/fleetview.css'];
 }
 
 /**

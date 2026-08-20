@@ -39,7 +39,7 @@ Html::header(
     PluginConfig::getTypeName(),
     $_SERVER['PHP_SELF'],
     'config',
-    'plugins'
+    'plugins',
 );
 
 $config = new PluginConfig();

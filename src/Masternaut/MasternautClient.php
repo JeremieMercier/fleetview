@@ -36,7 +36,10 @@ namespace GlpiPlugin\Fleetview\Masternaut;
 use GlpiPlugin\Fleetview\PluginConfig;
 use GuzzleHttp\Exception\GuzzleException;
 use Psr\SimpleCache\CacheInterface;
+use Safe\Exceptions\JsonException;
 use Toolbox;
+
+use function Safe\json_decode;
 
 /**
  * Masternaut (Michelin Connected Fleet) "Connect API" client.
@@ -56,6 +59,10 @@ final class MasternautClient
     /** @var array<string, string> */
     private array $config;
 
+    /**
+     * @param ?array<string, string> $config Configuration override (defaults
+     *                                       to the stored plugin configuration)
+     */
     public function __construct(?array $config = null)
     {
         $this->config = $config ?? PluginConfig::getConfig();
@@ -91,6 +98,7 @@ final class MasternautClient
      *      driver_name: ?string,
      *      updated_at: ?string,
      *      event_type: ?string,
+     *      status: ?string,
      * }>
      *
      * @throws MasternautApiException
@@ -112,7 +120,7 @@ final class MasternautClient
 
         $vehicles = [];
         foreach ($this->getLatestPositions() as $item) {
-            $info = $fleet_info[(string) ($item['assetId'] ?? '')] ?? null;
+            $info = $fleet_info[$this->toString($item['assetId'] ?? null)] ?? null;
             if (
                 ($filter_groups !== [] && $info !== null && !in_array($info['group'], $filter_groups, true))
                 || ($filter_statuses !== [] && $info !== null && !in_array($info['status'], $filter_statuses, true))
@@ -120,24 +128,27 @@ final class MasternautClient
                 continue;
             }
 
-            $distance = self::haversineKm($latitude, $longitude, (float) $item['latitude'], (float) $item['longitude']);
+            $item_latitude  = $this->toFloat($item['latitude'] ?? null);
+            $item_longitude = $this->toFloat($item['longitude'] ?? null);
+
+            $distance = $this->haversineKm($latitude, $longitude, $item_latitude, $item_longitude);
             if ($distance > $radius) {
                 continue;
             }
 
-            $name         = (string) ($item['assetName'] ?? '');
-            $registration = (string) ($item['assetRegistration'] ?? '');
+            $name         = $this->toString($item['assetName'] ?? null);
+            $registration = $this->toString($item['assetRegistration'] ?? null);
 
             $vehicles[] = [
-                'id'           => (string) ($item['assetId'] ?? ''),
+                'id'           => $this->toString($item['assetId'] ?? null),
                 'label'        => $name !== '' ? $name : $registration,
                 'registration' => $registration,
                 'distance_km'  => round($distance, 1),
-                'latitude'     => (float) $item['latitude'],
-                'longitude'    => (float) $item['longitude'],
-                'driver_name'  => $item['driverName'] ?? null,
-                'updated_at'   => $item['date'] ?? null,
-                'event_type'   => $item['eventType'] ?? null,
+                'latitude'     => $item_latitude,
+                'longitude'    => $item_longitude,
+                'driver_name'  => $this->toStringOrNull($item['driverName'] ?? null),
+                'updated_at'   => $this->toStringOrNull($item['date'] ?? null),
+                'event_type'   => $this->toStringOrNull($item['eventType'] ?? null),
                 'status'       => $info['status'] ?? null,
             ];
         }
@@ -153,7 +164,7 @@ final class MasternautClient
      *
      * Cached server-side (see class docblock).
      *
-     * @return list<array<string, mixed>>
+     * @return list<array<array-key, mixed>>
      *
      * @throws MasternautApiException
      */
@@ -164,21 +175,38 @@ final class MasternautClient
 
         $cache_key = 'fleetview_live_positions_' . md5($this->config['customer_id'] . $this->config['api_username']);
 
-        $positions = $GLPI_CACHE->get($cache_key);
-        if (is_array($positions)) {
-            return $positions;
+        $cached = $GLPI_CACHE->get($cache_key);
+        if (is_array($cached)) {
+            return $this->filterPositionItems($cached);
         }
 
-        $response = $this->request('tracking/live/latest');
-        $items    = is_array($response) ? ($response['items'] ?? []) : [];
-
-        $positions = array_values(array_filter(
-            $items,
-            static fn($item) => is_array($item) && isset($item['latitude'], $item['longitude'])
-        ));
+        $response  = $this->request('tracking/live/latest');
+        $positions = [];
+        if (is_array($response) && isset($response['items']) && is_array($response['items'])) {
+            $positions = $this->filterPositionItems($response['items']);
+        }
 
         $lifetime = max(self::MIN_CACHE_LIFETIME, (int) $this->config['cache_lifetime']);
         $GLPI_CACHE->set($cache_key, $positions, $lifetime);
+
+        return $positions;
+    }
+
+    /**
+     * Keep only located position entries.
+     *
+     * @param array<array-key, mixed> $items
+     *
+     * @return list<array<array-key, mixed>>
+     */
+    private function filterPositionItems(array $items): array
+    {
+        $positions = [];
+        foreach ($items as $item) {
+            if (is_array($item) && isset($item['latitude'], $item['longitude'])) {
+                $positions[] = $item;
+            }
+        }
 
         return $positions;
     }
@@ -206,31 +234,18 @@ final class MasternautClient
 
         $cache_key = 'fleetview_vehicles_' . md5($this->config['customer_id'] . $this->config['api_username']);
 
-        $vehicles = $GLPI_CACHE->get($cache_key);
-        if (is_array($vehicles)) {
-            return $vehicles;
+        $cached = $GLPI_CACHE->get($cache_key);
+        if (is_array($cached)) {
+            return $this->buildVehicleList($cached);
         }
 
         $response = $this->request('vehicle');
-        $items    = is_array($response) ? ($response['items'] ?? []) : [];
-
-        $vehicles = [];
-        foreach ($items as $item) {
-            if (!is_array($item) || !isset($item['id'])) {
-                continue;
-            }
-            $vehicles[] = [
-                'id'           => (string) $item['id'],
-                'name'         => (string) ($item['name'] ?? ''),
-                'registration' => (string) ($item['registration'] ?? ''),
-                'group'        => (string) ($item['groupName'] ?? ''),
-                'type'         => (string) ($item['type'] ?? ''),
-                'make_model'   => trim(((string) ($item['make'] ?? '')) . ' ' . ((string) ($item['model'] ?? ''))),
-                'status'       => (string) ($item['status'] ?? ''),
-            ];
+        $items    = [];
+        if (is_array($response) && isset($response['items']) && is_array($response['items'])) {
+            $items = $response['items'];
         }
 
-        usort($vehicles, static fn(array $a, array $b) => strnatcasecmp($a['name'], $b['name']));
+        $vehicles = $this->buildVehicleList($items);
 
         $GLPI_CACHE->set($cache_key, $vehicles, 600);
 
@@ -238,9 +253,61 @@ final class MasternautClient
     }
 
     /**
+     * @param array<array-key, mixed> $items
+     *
+     * @return list<array{
+     *      id: string,
+     *      name: string,
+     *      registration: string,
+     *      group: string,
+     *      type: string,
+     *      make_model: string,
+     *      status: string,
+     * }>
+     */
+    private function buildVehicleList(array $items): array
+    {
+        $vehicles = [];
+        foreach ($items as $item) {
+            if (!is_array($item) || !isset($item['id'])) {
+                continue;
+            }
+
+            $vehicles[] = [
+                'id'           => $this->toString($item['id']),
+                'name'         => $this->toString($item['name'] ?? null),
+                'registration' => $this->toString($item['registration'] ?? null),
+                'group'        => $this->toString($item['groupName'] ?? null),
+                'type'         => $this->toString($item['type'] ?? null),
+                'make_model'   => trim($this->toString($item['make'] ?? null) . ' ' . $this->toString($item['model'] ?? null)),
+                'status'       => $this->toString($item['status'] ?? null),
+            ];
+        }
+
+        usort($vehicles, static fn(array $a, array $b) => strnatcasecmp($a['name'], $b['name']));
+
+        return $vehicles;
+    }
+
+    private function toString(mixed $value): string
+    {
+        return is_scalar($value) ? (string) $value : '';
+    }
+
+    private function toStringOrNull(mixed $value): ?string
+    {
+        return is_scalar($value) ? (string) $value : null;
+    }
+
+    private function toFloat(mixed $value): float
+    {
+        return is_numeric($value) ? (float) $value : 0.0;
+    }
+
+    /**
      * Great-circle distance between two points, in kilometers.
      */
-    private static function haversineKm(float $lat1, float $lng1, float $lat2, float $lng2): float
+    private function haversineKm(float $lat1, float $lng1, float $lat2, float $lng2): float
     {
         $dlat = deg2rad($lat2 - $lat1);
         $dlng = deg2rad($lng2 - $lng1);
@@ -270,7 +337,7 @@ final class MasternautClient
             '%s/v1/customer/%s/%s',
             rtrim($this->config['api_base_url'], '/'),
             rawurlencode(trim($this->config['customer_id'])),
-            ltrim($path, '/')
+            ltrim($path, '/'),
         );
 
         $client = Toolbox::getGuzzleClient([
@@ -287,9 +354,9 @@ final class MasternautClient
                 'query'       => $query,
                 'http_errors' => false,
             ]);
-        } catch (GuzzleException $e) {
-            Toolbox::logInFile('fleetview', sprintf("GET %s failed: %s\n", $path, $e->getMessage()));
-            throw new MasternautApiException(__('Unable to reach the Masternaut API.', 'fleetview'), 0, $e);
+        } catch (GuzzleException $guzzleException) {
+            Toolbox::logInFile('fleetview', sprintf("GET %s failed: %s\n", $path, $guzzleException->getMessage()));
+            throw new MasternautApiException(__('Unable to reach the Masternaut API.', 'fleetview'), 0, $guzzleException);
         }
 
         $status = $response->getStatusCode();
@@ -304,15 +371,33 @@ final class MasternautClient
         }
 
         if ($status !== 200 && $status !== 204) {
-            $error = json_decode($body, true);
+            $message = __('unknown error', 'fleetview');
+            try {
+                $error = json_decode($body, true);
+                if (is_array($error) && is_string($error['errorMsg'] ?? null)) {
+                    $message = $error['errorMsg'];
+                }
+            } catch (JsonException) {
+                // Unparsable error body: keep the generic message
+            }
+
             Toolbox::logInFile('fleetview', sprintf("GET %s returned HTTP %d: %s\n", $path, $status, $body));
             throw new MasternautApiException(sprintf(
                 __('Masternaut API error (HTTP %1$d): %2$s', 'fleetview'),
                 $status,
-                $error['errorMsg'] ?? __('unknown error', 'fleetview')
+                $message,
             ));
         }
 
-        return $body === '' ? [] : json_decode($body, true);
+        if ($body === '') {
+            return [];
+        }
+
+        try {
+            return json_decode($body, true);
+        } catch (JsonException $jsonException) {
+            Toolbox::logInFile('fleetview', sprintf("GET %s returned unparsable JSON\n", $path));
+            throw new MasternautApiException(__('Unable to reach the Masternaut API.', 'fleetview'), 0, $jsonException);
+        }
     }
 }

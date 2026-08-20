@@ -29,7 +29,7 @@
  * -------------------------------------------------------------------------
  */
 
-/* global CFG_GLPI, bootstrap, L, getAjaxCsrfToken */
+/* global bootstrap, L, getAjaxCsrfToken, _ */
 
 (() => {
     'use strict';

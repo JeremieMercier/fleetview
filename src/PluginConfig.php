@@ -39,7 +39,11 @@ use Glpi\Application\View\TemplateRenderer;
 use GLPIKey;
 use GlpiPlugin\Fleetview\Masternaut\MasternautApiException;
 use GlpiPlugin\Fleetview\Masternaut\MasternautClient;
+use Safe\Exceptions\JsonException;
 use Session;
+
+use function Safe\json_decode;
+use function Safe\json_encode;
 
 /**
  * Plugin configuration, stored in the `glpi_configs` table under the
@@ -112,7 +116,12 @@ final class PluginConfig extends CommonGLPI
      */
     public static function getConfig(): array
     {
-        $values = Config::getConfigurationValues(self::CONTEXT);
+        $values = [];
+        foreach (Config::getConfigurationValues(self::CONTEXT) as $name => $value) {
+            if (is_string($name) && is_string($value)) {
+                $values[$name] = $value;
+            }
+        }
 
         // Core encrypts secured values on write (setConfigurationValues) but
         // getConfigurationValues returns them as-is: decrypt them here.
@@ -124,6 +133,19 @@ final class PluginConfig extends CommonGLPI
         }
 
         return array_merge(self::getDefaults(), $values);
+    }
+
+    /**
+     * URL prefix of the GLPI instance, for plugin routes and pages.
+     */
+    public static function getRootDoc(): string
+    {
+        /** @var array<string, mixed> $CFG_GLPI */
+        global $CFG_GLPI;
+
+        $root_doc = $CFG_GLPI['root_doc'] ?? '';
+
+        return is_string($root_doc) ? $root_doc : '';
     }
 
     /**
@@ -179,9 +201,6 @@ final class PluginConfig extends CommonGLPI
 
     private static function showApiForm(): void
     {
-        /** @var array $CFG_GLPI */
-        global $CFG_GLPI;
-
         if (!Session::haveRight(self::$rightname, UPDATE)) {
             return;
         }
@@ -193,7 +212,7 @@ final class PluginConfig extends CommonGLPI
 
         TemplateRenderer::getInstance()->display('@fleetview/config_api.html.twig', [
             'config'      => $config,
-            'form_action' => $CFG_GLPI['root_doc'] . '/plugins/fleetview/config',
+            'form_action' => self::getRootDoc() . '/plugins/fleetview/config',
         ]);
     }
 
@@ -209,9 +228,25 @@ final class PluginConfig extends CommonGLPI
             return [];
         }
 
-        $decoded = json_decode($value, true);
+        try {
+            $decoded = json_decode($value, true);
+        } catch (JsonException) {
+            // Legacy single value, stored before these settings were lists
+            return [$value];
+        }
 
-        return is_array($decoded) ? array_values(array_map(strval(...), $decoded)) : [$value];
+        if (!is_array($decoded)) {
+            return [$value];
+        }
+
+        $list = [];
+        foreach ($decoded as $item) {
+            if (is_scalar($item)) {
+                $list[] = (string) $item;
+            }
+        }
+
+        return $list;
     }
 
     public static function getStatusLabel(string $status): string
@@ -226,9 +261,6 @@ final class PluginConfig extends CommonGLPI
 
     private static function showDisplayForm(): void
     {
-        /** @var array $CFG_GLPI */
-        global $CFG_GLPI;
-
         if (!Session::haveRight(self::$rightname, UPDATE)) {
             return;
         }
@@ -244,7 +276,7 @@ final class PluginConfig extends CommonGLPI
         sort($radius_choices);
         $radius_choices = array_combine(
             $radius_choices,
-            array_map(static fn(int $km) => sprintf('%d km', $km), $radius_choices)
+            array_map(static fn(int $km) => sprintf('%d km', $km), $radius_choices),
         );
 
         // Group choices for the map filter, from the fleet itself
@@ -257,6 +289,7 @@ final class PluginConfig extends CommonGLPI
                         $groups[$vehicle['group']] = $vehicle['group'];
                     }
                 }
+
                 ksort($groups);
             } catch (MasternautApiException) {
                 // The dropdown simply stays empty when the API is unreachable
@@ -265,7 +298,7 @@ final class PluginConfig extends CommonGLPI
 
         TemplateRenderer::getInstance()->display('@fleetview/config_display.html.twig', [
             'config'            => $config,
-            'form_action'       => $CFG_GLPI['root_doc'] . '/plugins/fleetview/config',
+            'form_action'       => self::getRootDoc() . '/plugins/fleetview/config',
             'radius_choices'    => $radius_choices,
             'groups'            => $groups,
             'selected_groups'   => self::decodeListValue($config['modal_group']),
@@ -281,9 +314,6 @@ final class PluginConfig extends CommonGLPI
 
     private static function showMappingsForm(): void
     {
-        /** @var array $CFG_GLPI */
-        global $CFG_GLPI;
-
         if (!Session::haveRight(self::$rightname, UPDATE)) {
             return;
         }
@@ -315,7 +345,7 @@ final class PluginConfig extends CommonGLPI
         TemplateRenderer::getInstance()->display('@fleetview/config_mappings.html.twig', [
             'vehicles'        => $vehicles,
             'vehicles_error'  => $vehicles_error,
-            'mappings_action' => $CFG_GLPI['root_doc'] . '/plugins/fleetview/mappings',
+            'mappings_action' => self::getRootDoc() . '/plugins/fleetview/mappings',
         ]);
     }
 
@@ -323,9 +353,9 @@ final class PluginConfig extends CommonGLPI
      * Filter the input coming from the core config form
      * (called by Config::prepareInputForUpdate() through `config_class`).
      *
-     * @param array<string, mixed> $input
+     * @param array<array-key, mixed> $input
      *
-     * @return array<string, mixed>
+     * @return array<array-key, mixed>
      */
     public static function configUpdate(array $input): array
     {
@@ -341,7 +371,7 @@ final class PluginConfig extends CommonGLPI
             foreach (['modal_group', 'modal_status'] as $key) {
                 $values = array_values(array_filter(
                     (array) ($input[$key] ?? []),
-                    static fn($value) => $value !== '' && $value !== '0' && $value !== 0
+                    static fn($value) => !in_array($value, ['', '0', 0], true),
                 ));
                 $input[$key] = $values === [] ? '' : json_encode($values);
             }
@@ -354,7 +384,7 @@ final class PluginConfig extends CommonGLPI
     {
         $missing = array_diff_key(
             self::getDefaults(),
-            Config::getConfigurationValues(self::CONTEXT)
+            Config::getConfigurationValues(self::CONTEXT),
         );
 
         if ($missing !== []) {
@@ -366,7 +396,7 @@ final class PluginConfig extends CommonGLPI
     {
         Config::deleteConfigurationValues(
             self::CONTEXT,
-            array_keys(Config::getConfigurationValues(self::CONTEXT))
+            array_keys(Config::getConfigurationValues(self::CONTEXT)),
         );
     }
 }

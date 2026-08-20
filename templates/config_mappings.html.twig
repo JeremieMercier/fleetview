@@ -29,8 +29,6 @@
  # -------------------------------------------------------------------------
  #}
 
-{% import 'components/form/fields_macros.html.twig' as fields %}
-
 <form method="post" action="{{ mappings_action }}">
     <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token() }}" />
 

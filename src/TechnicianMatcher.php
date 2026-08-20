@@ -33,7 +33,10 @@
 
 namespace GlpiPlugin\Fleetview;
 
+use DBmysql;
 use User;
+
+use function Safe\preg_replace;
 
 /**
  * Matches fleet vehicle names against GLPI users. The fleet names vehicles
@@ -52,7 +55,7 @@ final class TechnicianMatcher
      */
     public function match(?string $name): ?int
     {
-        $normalized = self::normalize((string) $name);
+        $normalized = $this->normalize((string) $name);
         if ($normalized === '') {
             return null;
         }
@@ -67,7 +70,7 @@ final class TechnicianMatcher
      */
     private function getIndex(): array
     {
-        /** @var \DBmysql $DB */
+        /** @var DBmysql $DB */
         global $DB;
 
         if ($this->index !== null) {
@@ -86,28 +89,33 @@ final class TechnicianMatcher
         ]);
 
         foreach ($iterator as $user) {
-            $firstname = trim((string) $user['firstname']);
-            $realname  = trim((string) $user['realname']);
+            if (!is_array($user) || !is_numeric($user['id'] ?? null)) {
+                continue;
+            }
+
+            $firstname = is_scalar($user['firstname'] ?? null) ? trim((string) $user['firstname']) : '';
+            $realname  = is_scalar($user['realname'] ?? null) ? trim((string) $user['realname']) : '';
             if ($firstname === '' || $realname === '') {
                 continue;
             }
 
+            $user_id = (int) $user['id'];
             foreach ([$realname . ' ' . $firstname, $firstname . ' ' . $realname] as $full_name) {
-                $key = self::normalize($full_name);
+                $key = $this->normalize($full_name);
                 // Ambiguous names must never auto-assign someone
-                $this->index[$key] = isset($this->index[$key]) && $this->index[$key] !== (int) $user['id']
+                $this->index[$key] = isset($this->index[$key]) && $this->index[$key] !== $user_id
                     ? -1
-                    : (int) $user['id'];
+                    : $user_id;
             }
         }
 
         return $this->index;
     }
 
-    private static function normalize(string $name): string
+    private function normalize(string $name): string
     {
         $name = (string) transliterator_transliterate('Any-Latin; Latin-ASCII; Lower()', $name);
 
-        return trim((string) preg_replace('/[^a-z0-9]+/', ' ', $name));
+        return trim(preg_replace('/[^a-z0-9]+/', ' ', $name));
     }
 }

@@ -59,7 +59,7 @@ final class ConfigController extends AbstractController
         // SECURED_CONFIGS hook.
         $input = array_intersect_key(
             PluginConfig::configUpdate($request->request->all()),
-            PluginConfig::getDefaults()
+            PluginConfig::getDefaults(),
         );
         Config::setConfigurationValues(PluginConfig::CONTEXT, $input);
 
@@ -81,10 +81,15 @@ final class ConfigController extends AbstractController
         $labels   = $request->request->all('labels');
 
         foreach ($mappings as $asset_id => $users_id) {
+            if (!is_numeric($users_id)) {
+                continue;
+            }
+
+            $label = $labels[$asset_id] ?? '';
             VehicleMapping::save(
                 (string) $asset_id,
-                (string) ($labels[$asset_id] ?? ''),
-                (int) $users_id
+                is_scalar($label) ? (string) $label : '',
+                (int) $users_id,
             );
         }
 
@@ -99,9 +104,6 @@ final class ConfigController extends AbstractController
 
     private function redirectToPluginPage(): RedirectResponse
     {
-        /** @var array $CFG_GLPI */
-        global $CFG_GLPI;
-
-        return new RedirectResponse($CFG_GLPI['root_doc'] . '/plugins/fleetview/front/config.form.php');
+        return new RedirectResponse(PluginConfig::getRootDoc() . '/plugins/fleetview/front/config.form.php');
     }
 }

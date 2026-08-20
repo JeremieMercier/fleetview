@@ -53,3 +53,19 @@ git).
 * Refer to [GitFlow](http://git-flow.readthedocs.io/) process for branching
 * Work on a new branch on your own fork
 * Open a PR that will be reviewed by a developer
+
+## Qualité (outils GLPI)
+
+Le plugin passe les outils qualité du core GLPI sans erreur :
+
+- `php-cs-fixer` (standard PER-CS) ;
+- `phpstan` niveau **max** avec les extensions GLPI (`phpstan-glpi`, règles de
+  dépréciation, fonctions `Safe`) ;
+- `rector` avec la baseline officielle `PluginsRector.php` du core ;
+- `twigcs`, `eslint` (config GLPI) et `stylelint`.
+
+Note : les configurations du template (`phpstan.neon`, `rector.php`,
+`eslint.config.mjs`, `.stylelintrc.js`) référencent GLPI via `../../` et
+supposent donc que le plugin est **physiquement** dans `glpi/plugins/`. Si le
+plugin est lié par lien symbolique (setup de dev), lancer les outils avec des
+configurations recopiées en chemins absolus.

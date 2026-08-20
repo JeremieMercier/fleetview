@@ -60,7 +60,9 @@ final class VehicleMapping extends CommonDBTM
 
         $map = [];
         foreach ($DB->request(['FROM' => self::getTable()]) as $row) {
-            $map[(string) $row['asset_id']] = (int) $row['users_id'];
+            if (is_array($row) && is_scalar($row['asset_id'] ?? null) && is_numeric($row['users_id'] ?? null)) {
+                $map[(string) $row['asset_id']] = (int) $row['users_id'];
+            }
         }
 
         return $map;
@@ -78,17 +80,20 @@ final class VehicleMapping extends CommonDBTM
             if ($exists) {
                 $mapping->delete(['id' => $mapping->getID()], true);
             }
+
             return;
         }
 
         if ($exists) {
-            if ((int) $mapping->fields['users_id'] !== $users_id || $mapping->fields['asset_label'] !== $asset_label) {
+            $current_users_id = is_numeric($mapping->fields['users_id'] ?? null) ? (int) $mapping->fields['users_id'] : 0;
+            if ($current_users_id !== $users_id || $mapping->fields['asset_label'] !== $asset_label) {
                 $mapping->update([
                     'id'          => $mapping->getID(),
                     'users_id'    => $users_id,
                     'asset_label' => $asset_label,
                 ]);
             }
+
             return;
         }
 
@@ -112,7 +117,7 @@ final class VehicleMapping extends CommonDBTM
             $sign      = DBConnection::getDefaultPrimaryKeySignOption();
 
             $DB->doQuery(
-                "CREATE TABLE `$table` (
+                "CREATE TABLE `{$table}` (
                     `id` int {$sign} NOT NULL AUTO_INCREMENT,
                     `asset_id` varchar(255) NOT NULL,
                     `asset_label` varchar(255) NOT NULL DEFAULT '',
@@ -120,7 +125,7 @@ final class VehicleMapping extends CommonDBTM
                     PRIMARY KEY (`id`),
                     UNIQUE KEY `asset_id` (`asset_id`),
                     KEY `users_id` (`users_id`)
-                ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation} ROW_FORMAT=DYNAMIC"
+                ) ENGINE=InnoDB DEFAULT CHARSET={$charset} COLLATE={$collation} ROW_FORMAT=DYNAMIC",
             );
         }
 

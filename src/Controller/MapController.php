@@ -42,6 +42,7 @@ use GlpiPlugin\Fleetview\Routing\OsrmRouter;
 use GlpiPlugin\Fleetview\TechnicianMatcher;
 use GlpiPlugin\Fleetview\VehicleMapping;
 use Location;
+use Safe\Exceptions\JsonException;
 use Ticket_User;
 use User;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -49,6 +50,8 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Ticket;
+
+use function Safe\json_decode;
 
 /**
  * AJAX endpoints backing the "nearby technicians" map modal on the ticket
@@ -61,7 +64,7 @@ final class MapController extends AbstractController
      * Geographic context of a ticket: coordinates of its location, if any.
      * Used by the JS to decide whether the map button should be displayed.
      */
-    #[Route(path: 'ticket/{id}/context', name: 'ticket_context', methods: ['GET'], requirements: ['id' => '\d+'])]
+    #[Route(path: 'ticket/{id}/context', name: 'ticket_context', requirements: ['id' => '\d+'], methods: ['GET'])]
     public function ticketContext(int $id): JsonResponse
     {
         $ticket = Ticket::getById($id);
@@ -80,7 +83,7 @@ final class MapController extends AbstractController
     /**
      * Fleet vehicles near the ticket location, with live positions.
      */
-    #[Route(path: 'ticket/{id}/vehicles', name: 'ticket_vehicles', methods: ['GET'], requirements: ['id' => '\d+'])]
+    #[Route(path: 'ticket/{id}/vehicles', name: 'ticket_vehicles', requirements: ['id' => '\d+'], methods: ['GET'])]
     public function ticketVehicles(Request $request, int $id): JsonResponse
     {
         $ticket = Ticket::getById($id);
@@ -108,10 +111,10 @@ final class MapController extends AbstractController
 
         try {
             $vehicles = $client->getNearbyVehicles($location['latitude'], $location['longitude']);
-        } catch (MasternautApiException $e) {
+        } catch (MasternautApiException $masternautApiException) {
             return new JsonResponse([
                 'configured' => true,
-                'error'      => $e->getMessage(),
+                'error'      => $masternautApiException->getMessage(),
                 'vehicles'   => [],
             ], Response::HTTP_BAD_GATEWAY);
         }
@@ -131,6 +134,7 @@ final class MapController extends AbstractController
                 default          => null,
             };
         }
+
         unset($vehicle);
 
         // Closest by driving time first; vehicles without an estimation come
@@ -150,8 +154,10 @@ final class MapController extends AbstractController
                     ?? $matcher?->match($vehicle['label'])
                     ?? $matcher?->match($vehicle['driver_name']);
             }
+
             $vehicle['user_id'] = $user_id;
         }
+
         unset($vehicle);
 
         return new JsonResponse([
@@ -170,7 +176,7 @@ final class MapController extends AbstractController
     /**
      * Assign a technician (matched from a fleet vehicle) to the ticket.
      */
-    #[Route(path: 'ticket/{id}/assign', name: 'ticket_assign', methods: ['POST'], requirements: ['id' => '\d+'])]
+    #[Route(path: 'ticket/{id}/assign', name: 'ticket_assign', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function assignTechnician(Request $request, int $id): JsonResponse
     {
         $ticket = Ticket::getById($id);
@@ -182,7 +188,12 @@ final class MapController extends AbstractController
             return new JsonResponse(['error' => __('You are not allowed to assign this ticket.', 'fleetview')], Response::HTTP_FORBIDDEN);
         }
 
-        $payload  = json_decode((string) $request->getContent(), true);
+        try {
+            $payload = json_decode((string) $request->getContent(), true);
+        } catch (JsonException) {
+            $payload = null;
+        }
+
         $users_id = is_array($payload) && is_numeric($payload['users_id'] ?? null) ? (int) $payload['users_id'] : 0;
 
         $user = User::getById($users_id);
@@ -225,13 +236,24 @@ final class MapController extends AbstractController
      */
     private function getTicketLocation(Ticket $ticket): ?array
     {
-        $location = Location::getById((int) $ticket->fields['locations_id']);
+        $locations_id = $ticket->fields['locations_id'] ?? null;
+        if (!is_numeric($locations_id)) {
+            return null;
+        }
+
+        $location = Location::getById((int) $locations_id);
         if ($location === false) {
             return null;
         }
 
-        $latitude  = trim((string) $location->fields['latitude']);
-        $longitude = trim((string) $location->fields['longitude']);
+        $raw_latitude  = $location->fields['latitude'] ?? null;
+        $raw_longitude = $location->fields['longitude'] ?? null;
+        if (!is_scalar($raw_latitude) || !is_scalar($raw_longitude)) {
+            return null;
+        }
+
+        $latitude  = trim((string) $raw_latitude);
+        $longitude = trim((string) $raw_longitude);
 
         if ($latitude === '' || $longitude === '' || !is_numeric($latitude) || !is_numeric($longitude)) {
             return null;
