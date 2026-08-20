@@ -26,7 +26,7 @@
  * SOFTWARE.
  * -------------------------------------------------------------------------
  * @license   MIT https://opensource.org/licenses/mit-license.php
- * @link      https://github.com/pluginsGLPI/fleetview
+ * @link      https://github.com/JeremieMercier/fleetview
  * -------------------------------------------------------------------------
  */
 

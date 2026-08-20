@@ -27,7 +27,7 @@
  * -------------------------------------------------------------------------
  * @copyright Copyright (C) 2026 by the Fleetview plugin team.
  * @license   MIT https://opensource.org/licenses/mit-license.php
- * @link      https://github.com/pluginsGLPI/fleetview
+ * @link      https://github.com/JeremieMercier/fleetview
  * -------------------------------------------------------------------------
  */
 
@@ -95,7 +95,7 @@ function plugin_version_fleetview(): array
         'version'        => PLUGIN_FLEETVIEW_VERSION,
         'author'         => 'Jérémie Mercier',
         'license'        => 'MIT',
-        'homepage'       => '',
+        'homepage'       => 'https://github.com/JeremieMercier/fleetview',
         'requirements'   => [
             'glpi' => [
                 'min' => PLUGIN_FLEETVIEW_MIN_GLPI_VERSION,
