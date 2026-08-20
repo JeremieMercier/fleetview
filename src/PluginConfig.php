@@ -83,8 +83,9 @@ final class PluginConfig extends CommonGLPI
             'search_radius'  => '50',  // km around the ticket location (API max: 500)
             'max_results'    => '10',  // maximum number of vehicles returned
             'cache_lifetime' => '60',  // seconds, positions cache (API limit: 1 req/15s)
-            // Restrict the vehicles shown in the map modal; empty = no filter
-            'modal_group'  => '',      // Masternaut group name
+            // Restrict the vehicles shown in the map modal; empty = no filter,
+            // multiple choices stored as a JSON array
+            'modal_group'  => '',      // Masternaut group names
             'modal_status' => '',      // IN_CIRCULATION / IN_MAINTENANCE / SOLD
             // OSRM-compatible routing service for driving time estimations.
             // Coordinates are sent to this third-party service; empty = disabled.
@@ -196,6 +197,23 @@ final class PluginConfig extends CommonGLPI
         ]);
     }
 
+    /**
+     * Decode a stored list value ('' = empty, JSON array, or a legacy single
+     * value from when these settings were single-choice).
+     *
+     * @return list<string>
+     */
+    public static function decodeListValue(string $value): array
+    {
+        if (trim($value) === '') {
+            return [];
+        }
+
+        $decoded = json_decode($value, true);
+
+        return is_array($decoded) ? array_values(array_map(strval(...), $decoded)) : [$value];
+    }
+
     public static function getStatusLabel(string $status): string
     {
         return match ($status) {
@@ -234,10 +252,12 @@ final class PluginConfig extends CommonGLPI
         }
 
         TemplateRenderer::getInstance()->display('@fleetview/config_display.html.twig', [
-            'config'      => $config,
-            'form_action' => $CFG_GLPI['root_doc'] . '/plugins/fleetview/config',
-            'groups'      => $groups,
-            'statuses'    => [
+            'config'            => $config,
+            'form_action'       => $CFG_GLPI['root_doc'] . '/plugins/fleetview/config',
+            'groups'            => $groups,
+            'selected_groups'   => self::decodeListValue($config['modal_group']),
+            'selected_statuses' => self::decodeListValue($config['modal_status']),
+            'statuses'          => [
                 'IN_CIRCULATION' => self::getStatusLabel('IN_CIRCULATION'),
                 'IN_MAINTENANCE' => self::getStatusLabel('IN_MAINTENANCE'),
                 'SOLD'           => self::getStatusLabel('SOLD'),
@@ -300,10 +320,16 @@ final class PluginConfig extends CommonGLPI
             unset($input['api_secret']);
         }
 
-        // Dropdowns post "0" for their empty choice ("no filter")
-        foreach (['modal_group', 'modal_status'] as $key) {
-            if (($input[$key] ?? null) === '0' || ($input[$key] ?? null) === 0) {
-                $input[$key] = '';
+        // Multi-select map filters: normalize to a JSON array, empty = no
+        // filter. Only when the customization form is submitted (an absent
+        // multiple select means "cleared", but only for its own form).
+        if (($input['_tab'] ?? null) === '2') {
+            foreach (['modal_group', 'modal_status'] as $key) {
+                $values = array_values(array_filter(
+                    (array) ($input[$key] ?? []),
+                    static fn($value) => $value !== '' && $value !== '0' && $value !== 0
+                ));
+                $input[$key] = $values === [] ? '' : json_encode($values);
             }
         }
 

@@ -289,24 +289,28 @@ msgid "Sold"
 msgstr "Sold"
 
 #: templates/config_display.html.twig
-msgid "Vehicle group shown on the map"
-msgstr "Vehicle group shown on the map"
+msgid "Vehicle groups shown on the map"
+msgstr "Vehicle groups shown on the map"
 
 #: templates/config_display.html.twig
 msgid ""
-"Only vehicles of this Masternaut group appear in the nearby technicians "
-"modal."
+"Only vehicles of these Masternaut groups appear in the nearby technicians "
+"modal. Empty = all groups."
 msgstr ""
-"Only vehicles of this Masternaut group appear in the nearby technicians "
-"modal."
+"Only vehicles of these Masternaut groups appear in the nearby technicians "
+"modal. Empty = all groups."
 
 #: templates/config_display.html.twig
-msgid "Vehicle status shown on the map"
-msgstr "Vehicle status shown on the map"
+msgid "Vehicle statuses shown on the map"
+msgstr "Vehicle statuses shown on the map"
 
 #: templates/config_display.html.twig
-msgid "Only vehicles with this status appear in the nearby technicians modal."
-msgstr "Only vehicles with this status appear in the nearby technicians modal."
+msgid ""
+"Only vehicles with these statuses appear in the nearby technicians modal. "
+"Empty = all statuses."
+msgstr ""
+"Only vehicles with these statuses appear in the nearby technicians modal. "
+"Empty = all statuses."
 
 #: templates/config_display.html.twig
 msgid "All statuses"

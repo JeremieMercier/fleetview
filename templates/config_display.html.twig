@@ -83,25 +83,25 @@
 
             {{ fields.dropdownArrayField(
                 'modal_group',
-                config['modal_group'],
+                null,
                 groups,
-                __('Vehicle group shown on the map', 'fleetview'),
+                __('Vehicle groups shown on the map', 'fleetview'),
                 {
-                    'display_emptychoice': true,
-                    'emptylabel': __('All groups', 'fleetview'),
-                    'helper': __('Only vehicles of this Masternaut group appear in the nearby technicians modal.', 'fleetview'),
+                    'multiple': true,
+                    'values': selected_groups,
+                    'helper': __('Only vehicles of these Masternaut groups appear in the nearby technicians modal. Empty = all groups.', 'fleetview'),
                 }
             ) }}
 
             {{ fields.dropdownArrayField(
                 'modal_status',
-                config['modal_status'],
+                null,
                 statuses,
-                __('Vehicle status shown on the map', 'fleetview'),
+                __('Vehicle statuses shown on the map', 'fleetview'),
                 {
-                    'display_emptychoice': true,
-                    'emptylabel': __('All statuses', 'fleetview'),
-                    'helper': __('Only vehicles with this status appear in the nearby technicians modal.', 'fleetview'),
+                    'multiple': true,
+                    'values': selected_statuses,
+                    'helper': __('Only vehicles with these statuses appear in the nearby technicians modal. Empty = all statuses.', 'fleetview'),
                 }
             ) }}
 
