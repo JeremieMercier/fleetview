@@ -33,6 +33,7 @@
 
 namespace GlpiPlugin\Fleetview\Tests;
 
+use Glpi\Exception\Http\AccessDeniedHttpException;
 use Config;
 use Glpi\Tests\DbTestCase;
 use GlpiPlugin\Fleetview\Controller\ConfigController;
@@ -157,7 +158,7 @@ final class ConfigControllerTest extends DbTestCase
     {
         $this->login('post-only');
 
-        $this->expectException(\Glpi\Exception\Http\AccessDeniedHttpException::class);
+        $this->expectException(AccessDeniedHttpException::class);
 
         (new ConfigController())->saveConfig(Request::create('', 'POST', [
             '_tab'         => '1',
@@ -169,7 +170,7 @@ final class ConfigControllerTest extends DbTestCase
     {
         $this->login('post-only');
 
-        $this->expectException(\Glpi\Exception\Http\AccessDeniedHttpException::class);
+        $this->expectException(AccessDeniedHttpException::class);
 
         (new ConfigController())->saveMappings(Request::create('', 'POST', [
             'mappings' => ['test_asset' => '42'],

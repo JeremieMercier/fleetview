@@ -63,7 +63,7 @@ final class ConfigController extends AbstractController
         );
         Config::setConfigurationValues(PluginConfig::CONTEXT, $input);
 
-        Session::addMessageAfterRedirect(__('Configuration has been saved.', 'fleetview'));
+        Session::addMessageAfterRedirect(htmlescape(__('Configuration has been saved.', 'fleetview')));
 
         // Land back on the tab (API or Customization) the form came from
         $tab = $request->request->getInt('_tab') === 2 ? 2 : 1;
@@ -93,7 +93,7 @@ final class ConfigController extends AbstractController
             );
         }
 
-        Session::addMessageAfterRedirect(__('Vehicle associations have been saved.', 'fleetview'));
+        Session::addMessageAfterRedirect(htmlescape(__('Vehicle associations have been saved.', 'fleetview')));
 
         // Land back on the associations tab (forcetab cannot resolve the
         // itemtype from a plugin front URL, so set the session tab directly)

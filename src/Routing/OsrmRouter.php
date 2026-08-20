@@ -55,7 +55,7 @@ final class OsrmRouter
      * @param ?ClientInterface $http_client HTTP client override, mainly for
      *        tests (defaults to the GLPI Guzzle client, proxy-aware)
      */
-    public function __construct(private string $base_url, private ?ClientInterface $http_client = null)
+    public function __construct(private string $base_url, private readonly ?ClientInterface $http_client = null)
     {
         $this->base_url = rtrim(trim($base_url), '/');
     }

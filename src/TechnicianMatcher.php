@@ -55,7 +55,7 @@ final class TechnicianMatcher
      *        (`id`, `firstname`, `realname`), mainly for unit tests; defaults
      *        to the active, non-deleted GLPI users.
      */
-    public function __construct(private ?iterable $users = null) {}
+    public function __construct(private readonly ?iterable $users = null) {}
 
     /**
      * GLPI user id matching the given vehicle/driver name, or null.

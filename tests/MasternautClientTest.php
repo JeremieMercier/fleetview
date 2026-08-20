@@ -33,6 +33,7 @@
 
 namespace GlpiPlugin\Fleetview\Tests;
 
+use Psr\Http\Message\RequestInterface;
 use GlpiPlugin\Fleetview\Masternaut\MasternautApiException;
 use GlpiPlugin\Fleetview\Masternaut\MasternautClient;
 use GlpiPlugin\Fleetview\PluginConfig;
@@ -49,7 +50,7 @@ use PHPUnit\Framework\TestCase;
  */
 final class MasternautClientTest extends TestCase
 {
-    /** @var array<int, array{request: \Psr\Http\Message\RequestInterface}> */
+    /** @var array<int, array{request: RequestInterface}> */
     private array $history = [];
 
     /**
@@ -80,7 +81,7 @@ final class MasternautClientTest extends TestCase
         return new Client(['handler' => $stack]);
     }
 
-    private static function vehiclesResponse(): Response
+    private function vehiclesResponse(): Response
     {
         return new Response(200, [], json_encode(['items' => [
             [
@@ -108,7 +109,7 @@ final class MasternautClientTest extends TestCase
         ]]));
     }
 
-    private static function positionsResponse(): Response
+    private function positionsResponse(): Response
     {
         return new Response(200, [], json_encode(['items' => [
             // ~1.2 km from the fake ticket point (48.85, 2.35)
@@ -176,7 +177,7 @@ final class MasternautClientTest extends TestCase
     public function testGetVehiclesParsesSortsAndAuthenticates(): void
     {
         $config = $this->fakeConfig();
-        $client = new MasternautClient($config, $this->mockHttpClient([self::vehiclesResponse()]));
+        $client = new MasternautClient($config, $this->mockHttpClient([$this->vehiclesResponse()]));
 
         $vehicles = $client->getVehicles();
 
@@ -211,7 +212,7 @@ final class MasternautClientTest extends TestCase
     public function testGetVehiclesIsCached(): void
     {
         $config = $this->fakeConfig();
-        $client = new MasternautClient($config, $this->mockHttpClient([self::vehiclesResponse()]));
+        $client = new MasternautClient($config, $this->mockHttpClient([$this->vehiclesResponse()]));
 
         $first  = $client->getVehicles();
         $second = (new MasternautClient($config, $this->mockHttpClient([])))->getVehicles();
@@ -222,7 +223,7 @@ final class MasternautClientTest extends TestCase
 
     public function testGetLatestPositionsKeepsOnlyLocatedItems(): void
     {
-        $client = new MasternautClient($this->fakeConfig(), $this->mockHttpClient([self::positionsResponse()]));
+        $client = new MasternautClient($this->fakeConfig(), $this->mockHttpClient([$this->positionsResponse()]));
 
         $positions = $client->getLatestPositions();
 
@@ -237,7 +238,7 @@ final class MasternautClientTest extends TestCase
     {
         $client = new MasternautClient(
             $this->fakeConfig(['search_radius' => '100']),
-            $this->mockHttpClient([self::vehiclesResponse(), self::positionsResponse()]),
+            $this->mockHttpClient([$this->vehiclesResponse(), $this->positionsResponse()]),
         );
 
         $vehicles = $client->getNearbyVehicles(48.85, 2.35);
@@ -261,7 +262,7 @@ final class MasternautClientTest extends TestCase
     {
         $client = new MasternautClient(
             $this->fakeConfig(['modal_group' => '["Zone Alpha"]']),
-            $this->mockHttpClient([self::vehiclesResponse(), self::positionsResponse()]),
+            $this->mockHttpClient([$this->vehiclesResponse(), $this->positionsResponse()]),
         );
 
         // Zone Bravo excluded; unknown assets kept (fail open)
@@ -272,7 +273,7 @@ final class MasternautClientTest extends TestCase
 
         $client = new MasternautClient(
             $this->fakeConfig(['modal_status' => '["IN_MAINTENANCE"]']),
-            $this->mockHttpClient([self::vehiclesResponse(), self::positionsResponse()]),
+            $this->mockHttpClient([$this->vehiclesResponse(), $this->positionsResponse()]),
         );
 
         $this->assertSame(
@@ -285,7 +286,7 @@ final class MasternautClientTest extends TestCase
     {
         $client = new MasternautClient(
             $this->fakeConfig(['max_results' => '1']),
-            $this->mockHttpClient([self::vehiclesResponse(), self::positionsResponse()]),
+            $this->mockHttpClient([$this->vehiclesResponse(), $this->positionsResponse()]),
         );
 
         $this->assertSame(['101'], array_column($client->getNearbyVehicles(48.85, 2.35), 'id'));

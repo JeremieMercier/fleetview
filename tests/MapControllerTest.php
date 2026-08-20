@@ -92,6 +92,7 @@ final class MapControllerTest extends DbTestCase
                 'requester' => [['itemtype' => 'User', 'items_id' => $requester_id]],
             ];
         }
+
         $id = $ticket->add($input);
         $this->assertGreaterThan(0, $id);
 
@@ -101,7 +102,7 @@ final class MapControllerTest extends DbTestCase
     /**
      * @return array<array-key, mixed>
      */
-    private static function payload(JsonResponse $response): array
+    private function payload(JsonResponse $response): array
     {
         $decoded = json_decode((string) $response->getContent(), true);
         self::assertIsArray($decoded);
@@ -115,7 +116,7 @@ final class MapControllerTest extends DbTestCase
         $ticket = $this->createTicket();
 
         $response = (new MapController())->ticketContext($ticket->getID());
-        $payload  = self::payload($response);
+        $payload  = $this->payload($response);
 
         $this->assertSame(200, $response->getStatusCode());
         $this->assertFalse($payload['available']);
@@ -130,7 +131,7 @@ final class MapControllerTest extends DbTestCase
         $this->login('glpi');
         $ticket = $this->createTicket($this->createGeoLocation()->getID());
 
-        $payload = self::payload((new MapController())->ticketContext($ticket->getID()));
+        $payload = $this->payload((new MapController())->ticketContext($ticket->getID()));
 
         $this->assertTrue($payload['available']);
         $this->assertSame(48.8566, $payload['location']['latitude']);
@@ -160,9 +161,7 @@ final class MapControllerTest extends DbTestCase
         $this->login('glpi');
         $ticket = $this->createTicket($this->createGeoLocation()->getID());
 
-        $payload = self::payload(
-            (new MapController())->ticketVehicles(Request::create(''), $ticket->getID()),
-        );
+        $payload = $this->payload((new MapController())->ticketVehicles(Request::create(''), $ticket->getID()));
 
         $this->assertFalse($payload['configured']);
         $this->assertSame([], $payload['vehicles']);
@@ -185,7 +184,7 @@ final class MapControllerTest extends DbTestCase
         $request = Request::create('', 'POST', content: json_encode(['users_id' => $technician_id]));
 
         // First call: actor added
-        $payload = self::payload((new MapController())->assignTechnician($request, $ticket->getID()));
+        $payload = $this->payload((new MapController())->assignTechnician($request, $ticket->getID()));
         $this->assertTrue($payload['success']);
         $this->assertFalse($payload['already']);
         $this->assertSame(
@@ -198,7 +197,7 @@ final class MapControllerTest extends DbTestCase
         );
 
         // Second call: idempotent
-        $payload = self::payload((new MapController())->assignTechnician($request, $ticket->getID()));
+        $payload = $this->payload((new MapController())->assignTechnician($request, $ticket->getID()));
         $this->assertTrue($payload['success']);
         $this->assertTrue($payload['already']);
         $this->assertSame(
@@ -257,7 +256,7 @@ final class MapControllerTest extends DbTestCase
     /**
      * @param list<Response> $responses
      */
-    private static function mockedHttpClient(array $responses): Client
+    private function mockedHttpClient(array $responses): Client
     {
         return new Client(['handler' => HandlerStack::create(new MockHandler($responses))]);
     }
@@ -314,11 +313,11 @@ final class MapControllerTest extends DbTestCase
         return new MapController(
             fn(array $config): MasternautClient => new MasternautClient(
                 $config,
-                self::mockedHttpClient($masternaut_responses),
+                $this->mockedHttpClient($masternaut_responses),
             ),
             fn(string $base_url): OsrmRouter => new OsrmRouter(
                 $base_url,
-                self::mockedHttpClient($osrm_responses),
+                $this->mockedHttpClient($osrm_responses),
             ),
         );
     }
@@ -330,9 +329,7 @@ final class MapControllerTest extends DbTestCase
         $ticket = $this->createTicket($this->createGeoLocation()->getID());
         VehicleMapping::save('202', 'Martin Sophie', 4242);
 
-        $payload = self::payload(
-            $this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()),
-        );
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
 
         $this->assertTrue($payload['configured']);
         $this->assertTrue($payload['can_assign']);
@@ -371,9 +368,7 @@ final class MapControllerTest extends DbTestCase
         ]);
         $this->assertGreaterThan(0, $technician_id);
 
-        $payload = self::payload(
-            $this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()),
-        );
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
 
         $by_id = array_column($payload['vehicles'], 'user_id', 'id');
         $this->assertSame($technician_id, $by_id['201']);
@@ -385,9 +380,7 @@ final class MapControllerTest extends DbTestCase
         $this->configurePluginApi();
         $ticket = $this->createTicket($this->createGeoLocation()->getID());
 
-        $payload = self::payload(
-            $this->mockedController()->ticketVehicles(Request::create('', 'GET', ['radius' => '9999']), $ticket->getID()),
-        );
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create('', 'GET', ['radius' => '9999']), $ticket->getID()));
 
         $this->assertSame(500, (int) $payload['radius_km']);
     }
@@ -400,7 +393,7 @@ final class MapControllerTest extends DbTestCase
 
         $response = $this->mockedController([new Response(500, [], 'boom')])
             ->ticketVehicles(Request::create(''), $ticket->getID());
-        $payload = self::payload($response);
+        $payload = $this->payload($response);
 
         $this->assertSame(502, $response->getStatusCode());
         $this->assertTrue($payload['configured']);
@@ -417,9 +410,7 @@ final class MapControllerTest extends DbTestCase
         VehicleMapping::save('202', 'Martin Sophie', 4242);
 
         $this->login('post-only');
-        $payload = self::payload(
-            $this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()),
-        );
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
 
         $this->assertFalse($payload['can_assign']);
         $this->assertSame([null, null], array_column($payload['vehicles'], 'user_id'));

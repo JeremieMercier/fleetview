@@ -33,6 +33,7 @@
 
 namespace GlpiPlugin\Fleetview\Tests;
 
+use Psr\Http\Message\RequestInterface;
 use GlpiPlugin\Fleetview\Routing\OsrmRouter;
 use GuzzleHttp\Client;
 use GuzzleHttp\Handler\MockHandler;
@@ -47,15 +48,16 @@ use PHPUnit\Framework\TestCase;
 final class OsrmRouterTest extends TestCase
 {
     private const ORIGIN_LAT = 48.85;
+
     private const ORIGIN_LNG = 2.35;
 
-    /** @var array<int, array{request: \Psr\Http\Message\RequestInterface}> */
+    /** @var array<int, array{request: RequestInterface}> */
     private array $history = [];
 
     /**
      * @return list<array{latitude: float, longitude: float}>
      */
-    private static function destinations(): array
+    private function destinations(): array
     {
         return [
             ['latitude' => 48.86, 'longitude' => 2.36],
@@ -75,13 +77,13 @@ final class OsrmRouterTest extends TestCase
         return new Client(['handler' => $stack]);
     }
 
-    private static function fakeBaseUrl(): string
+    private function fakeBaseUrl(): string
     {
         // Unique per test: OSRM cache keys derive from the base URL
         return 'https://osrm.example.test/' . uniqid();
     }
 
-    private static function tableResponse(): Response
+    private function tableResponse(): Response
     {
         return new Response(200, [], json_encode([
             'code'      => 'Ok',
@@ -97,14 +99,14 @@ final class OsrmRouterTest extends TestCase
         $this->assertFalse($router->isEnabled());
         $this->assertSame(
             [null, null],
-            $router->getRoutesFromPoint(self::ORIGIN_LAT, self::ORIGIN_LNG, self::destinations()),
+            $router->getRoutesFromPoint(self::ORIGIN_LAT, self::ORIGIN_LNG, $this->destinations()),
         );
         $this->assertCount(0, $this->history);
     }
 
     public function testEmptyDestinationsShortCircuit(): void
     {
-        $router = new OsrmRouter(self::fakeBaseUrl(), $this->mockHttpClient([]));
+        $router = new OsrmRouter($this->fakeBaseUrl(), $this->mockHttpClient([]));
 
         $this->assertSame([], $router->getRoutesFromPoint(self::ORIGIN_LAT, self::ORIGIN_LNG, []));
         $this->assertCount(0, $this->history);
@@ -112,9 +114,9 @@ final class OsrmRouterTest extends TestCase
 
     public function testRoutesAreMappedFromTheTableResponse(): void
     {
-        $router = new OsrmRouter(self::fakeBaseUrl(), $this->mockHttpClient([self::tableResponse()]));
+        $router = new OsrmRouter($this->fakeBaseUrl(), $this->mockHttpClient([$this->tableResponse()]));
 
-        $routes = $router->getRoutesFromPoint(self::ORIGIN_LAT, self::ORIGIN_LNG, self::destinations());
+        $routes = $router->getRoutesFromPoint(self::ORIGIN_LAT, self::ORIGIN_LNG, $this->destinations());
 
         $this->assertSame(
             [
@@ -137,7 +139,7 @@ final class OsrmRouterTest extends TestCase
 
     public function testMissingMatrixEntriesYieldNulls(): void
     {
-        $router = new OsrmRouter(self::fakeBaseUrl(), $this->mockHttpClient([
+        $router = new OsrmRouter($this->fakeBaseUrl(), $this->mockHttpClient([
             new Response(200, [], json_encode([
                 'code'      => 'Ok',
                 'durations' => [[0, 600]],
@@ -147,7 +149,7 @@ final class OsrmRouterTest extends TestCase
 
         $this->assertSame(
             [['duration_min' => 10, 'distance_km' => 5.0], null],
-            $router->getRoutesFromPoint(self::ORIGIN_LAT, self::ORIGIN_LNG, self::destinations()),
+            $router->getRoutesFromPoint(self::ORIGIN_LAT, self::ORIGIN_LNG, $this->destinations()),
         );
     }
 
@@ -160,25 +162,25 @@ final class OsrmRouterTest extends TestCase
                 new Response(200, [], 'this is not json'),
             ] as $response
         ) {
-            $router = new OsrmRouter(self::fakeBaseUrl(), $this->mockHttpClient([$response]));
+            $router = new OsrmRouter($this->fakeBaseUrl(), $this->mockHttpClient([$response]));
 
             $this->assertSame(
                 [null, null],
-                $router->getRoutesFromPoint(self::ORIGIN_LAT, self::ORIGIN_LNG, self::destinations()),
+                $router->getRoutesFromPoint(self::ORIGIN_LAT, self::ORIGIN_LNG, $this->destinations()),
             );
         }
     }
 
     public function testRoutesAreCached(): void
     {
-        $base_url = self::fakeBaseUrl();
+        $base_url = $this->fakeBaseUrl();
 
-        $first = (new OsrmRouter($base_url, $this->mockHttpClient([self::tableResponse()])))
-            ->getRoutesFromPoint(self::ORIGIN_LAT, self::ORIGIN_LNG, self::destinations());
+        $first = (new OsrmRouter($base_url, $this->mockHttpClient([$this->tableResponse()])))
+            ->getRoutesFromPoint(self::ORIGIN_LAT, self::ORIGIN_LNG, $this->destinations());
 
         // No response queued: a second router instance must be served by the cache
         $second = (new OsrmRouter($base_url, $this->mockHttpClient([])))
-            ->getRoutesFromPoint(self::ORIGIN_LAT, self::ORIGIN_LNG, self::destinations());
+            ->getRoutesFromPoint(self::ORIGIN_LAT, self::ORIGIN_LNG, $this->destinations());
 
         $this->assertSame($first, $second);
         $this->assertCount(0, $this->history);
@@ -186,15 +188,15 @@ final class OsrmRouterTest extends TestCase
 
     public function testFailedLookupsAreNotCached(): void
     {
-        $base_url = self::fakeBaseUrl();
+        $base_url = $this->fakeBaseUrl();
 
         $first = (new OsrmRouter($base_url, $this->mockHttpClient([new Response(500, [], 'boom')])))
-            ->getRoutesFromPoint(self::ORIGIN_LAT, self::ORIGIN_LNG, self::destinations());
+            ->getRoutesFromPoint(self::ORIGIN_LAT, self::ORIGIN_LNG, $this->destinations());
         $this->assertSame([null, null], $first);
 
         // The failure must not poison the cache: the next call retries and succeeds
-        $second = (new OsrmRouter($base_url, $this->mockHttpClient([self::tableResponse()])))
-            ->getRoutesFromPoint(self::ORIGIN_LAT, self::ORIGIN_LNG, self::destinations());
+        $second = (new OsrmRouter($base_url, $this->mockHttpClient([$this->tableResponse()])))
+            ->getRoutesFromPoint(self::ORIGIN_LAT, self::ORIGIN_LNG, $this->destinations());
 
         $this->assertSame(10, $second[0]['duration_min'] ?? null);
     }

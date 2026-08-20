@@ -66,7 +66,7 @@ final class MasternautClient
      * @param ?ClientInterface       $http_client HTTP client override, mainly
      *        for tests (defaults to the GLPI Guzzle client, proxy-aware)
      */
-    public function __construct(?array $config = null, private ?ClientInterface $http_client = null)
+    public function __construct(?array $config = null, private readonly ?ClientInterface $http_client = null)
     {
         $this->config = $config ?? PluginConfig::getConfig();
     }

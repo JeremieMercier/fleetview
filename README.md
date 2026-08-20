@@ -18,10 +18,27 @@ position des véhicules de la flotte.
 ## Installation (développement)
 
 ```bash
-ln -s /Users/jeremie/Herd/fleetview /chemin/vers/glpi/plugins/fleetview
+# 1. Cloner le dépôt (n'importe où, ou directement dans glpi/plugins/)
+git clone https://github.com/JeremieMercier/fleetview.git /chemin/vers/fleetview
+
+# 2. Si cloné hors de GLPI : lier le plugin dans le dossier plugins
+ln -s /chemin/vers/fleetview /chemin/vers/glpi/plugins/fleetview
+
+# 3. (Optionnel, pour les tests) installer l'autoloader
+cd /chemin/vers/fleetview && composer install
 ```
 
-Puis installer/activer le plugin depuis *Configuration → Plugins*.
+Puis installer et activer le plugin depuis *Configuration → Plugins*, ou en
+ligne de commande depuis le dossier GLPI :
+
+```bash
+php bin/console glpi:plugin:install fleetview -u glpi
+php bin/console glpi:plugin:activate fleetview
+```
+
+> Note : les outils qualité et les tests supposent que le plugin est
+> physiquement dans `glpi/plugins/` (chemins relatifs `../../`). Avec un lien
+> symbolique, voir la section Qualité ci-dessous.
 
 ## Configuration
 

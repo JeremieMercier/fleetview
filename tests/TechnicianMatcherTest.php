@@ -46,7 +46,7 @@ final class TechnicianMatcherTest extends TestCase
     /**
      * @return list<array<array-key, mixed>>
      */
-    private static function fakeUsers(): array
+    private function fakeUsers(): array
     {
         return [
             ['id' => 1, 'firstname' => 'Jean', 'realname' => 'Dupont'],
@@ -68,7 +68,7 @@ final class TechnicianMatcherTest extends TestCase
 
     private function newMatcher(): TechnicianMatcher
     {
-        return new TechnicianMatcher(self::fakeUsers());
+        return new TechnicianMatcher($this->fakeUsers());
     }
 
     /**
@@ -115,7 +115,7 @@ final class TechnicianMatcherTest extends TestCase
     {
         // A generator can only be consumed once: a second match() call
         // succeeding proves the index is built a single time.
-        $users   = self::fakeUsers();
+        $users   = $this->fakeUsers();
         $matcher = new TechnicianMatcher((static function () use ($users) {
             yield from $users;
         })());

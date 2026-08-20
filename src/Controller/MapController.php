@@ -70,8 +70,8 @@ final class MapController extends AbstractController
      * @param ?Closure(string): OsrmRouter                      $osrm_factory
      */
     public function __construct(
-        private ?Closure $masternaut_factory = null,
-        private ?Closure $osrm_factory = null,
+        private readonly ?Closure $masternaut_factory = null,
+        private readonly ?Closure $osrm_factory = null,
     ) {}
 
     /**
@@ -247,7 +247,7 @@ final class MapController extends AbstractController
      */
     private function buildMasternautClient(array $config): MasternautClient
     {
-        if ($this->masternaut_factory !== null) {
+        if ($this->masternaut_factory instanceof Closure) {
             return ($this->masternaut_factory)($config);
         }
 
@@ -256,7 +256,7 @@ final class MapController extends AbstractController
 
     private function buildOsrmRouter(string $base_url): OsrmRouter
     {
-        if ($this->osrm_factory !== null) {
+        if ($this->osrm_factory instanceof Closure) {
             return ($this->osrm_factory)($base_url);
         }
 
