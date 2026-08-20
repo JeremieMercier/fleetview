@@ -7,10 +7,11 @@ on:
       - "**/bugfixes"
     paths:
       - "setup.php"
+  workflow_dispatch:
 
 jobs:
   auto-tag-new-version:
     name: "Automatically tag new version"
     uses: "glpi-project/plugin-release-workflows/.github/workflows/auto-tag-new-version.yml@v1"
     secrets:
-      github-token: "${{ secrets.AUTOTAG_TOKEN }}"
+      github-token: "${{ secrets.RELEASE_TOKEN }}"
