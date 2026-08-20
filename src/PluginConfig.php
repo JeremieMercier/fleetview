@@ -36,6 +36,7 @@ namespace GlpiPlugin\Fleetview;
 use CommonGLPI;
 use Config;
 use Glpi\Application\View\TemplateRenderer;
+use GLPIKey;
 use Session;
 
 /**
@@ -46,6 +47,12 @@ use Session;
 final class PluginConfig extends CommonGLPI
 {
     public const CONTEXT = 'plugin:fleetview';
+
+    /**
+     * Values encrypted with GLPIKey in the `glpi_configs` table.
+     * Also declared to the SECURED_CONFIGS hook in setup.php.
+     */
+    public const SECURED = ['api_secret'];
 
     public static $rightname = 'config';
 
@@ -85,10 +92,18 @@ final class PluginConfig extends CommonGLPI
      */
     public static function getConfig(): array
     {
-        return array_merge(
-            self::getDefaults(),
-            Config::getConfigurationValues(self::CONTEXT)
-        );
+        $values = Config::getConfigurationValues(self::CONTEXT);
+
+        // Core encrypts secured values on write (setConfigurationValues) but
+        // getConfigurationValues returns them as-is: decrypt them here.
+        $glpikey = new GLPIKey();
+        foreach (self::SECURED as $name) {
+            if (($values[$name] ?? '') !== '') {
+                $values[$name] = (string) $glpikey->decrypt($values[$name]);
+            }
+        }
+
+        return array_merge(self::getDefaults(), $values);
     }
 
     /**

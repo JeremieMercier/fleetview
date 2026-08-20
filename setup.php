@@ -57,7 +57,7 @@ function plugin_init_fleetview(): void
     $PLUGIN_HOOKS[Hooks::CSRF_COMPLIANT]['fleetview'] = true;
 
     // API credentials are encrypted with GLPIKey in the `glpi_configs` table
-    $PLUGIN_HOOKS[Hooks::SECURED_CONFIGS]['fleetview'] = ['api_secret'];
+    $PLUGIN_HOOKS[Hooks::SECURED_CONFIGS]['fleetview'] = PluginConfig::SECURED;
 
     if (!Session::getLoginUserID()) {
         return;
