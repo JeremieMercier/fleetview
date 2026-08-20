@@ -123,6 +123,13 @@ final class MapController extends AbstractController
         foreach ($vehicles as $i => &$vehicle) {
             $vehicle['travel_time_min'] = $routes[$i]['duration_min'] ?? null;
             $vehicle['road_distance_km'] = $routes[$i]['distance_km'] ?? null;
+            // Map-specific status labels ("Available" reads better than
+            // "In circulation" when picking a technician)
+            $vehicle['status_label'] = match ($vehicle['status']) {
+                'IN_CIRCULATION' => __('Available', 'fleetview'),
+                'IN_MAINTENANCE' => __('In maintenance', 'fleetview'),
+                default          => null,
+            };
         }
         unset($vehicle);
 

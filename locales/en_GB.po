@@ -315,3 +315,7 @@ msgstr ""
 #: templates/config_display.html.twig
 msgid "All statuses"
 msgstr "All statuses"
+
+#: src/Controller/MapController.php
+msgid "Available"
+msgstr "Available"

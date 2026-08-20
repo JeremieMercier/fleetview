@@ -367,8 +367,14 @@
                         + `<i class="ti ti-user-plus me-1"></i>${__('Assign this technician', 'fleetview')}</button>`
                     : null;
 
+                const status = vehicle.status_label
+                    ? `<i class="ti ${vehicle.status === 'IN_MAINTENANCE' ? 'ti-tool' : 'ti-circle-check'}"></i> `
+                        + `${_.escape(vehicle.status_label)}`
+                    : null;
+
                 const details = [
                     `<strong>${_.escape(vehicle.label)}</strong>`,
+                    status,
                     vehicle.driver_name ? `<i class="ti ti-user"></i> ${_.escape(vehicle.driver_name)}` : null,
                     `<i class="ti ti-route"></i> ${__('%1 km as the crow flies', 'fleetview', vehicle.distance_km)}`,
                     travel ? `<i class="ti ti-car"></i> ${travel}` : null,

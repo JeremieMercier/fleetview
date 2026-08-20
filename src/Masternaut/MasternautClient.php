@@ -100,16 +100,14 @@ final class MasternautClient
         $radius = min(500.0, max(1.0, (float) $this->config['search_radius']));
         $max    = max(1, (int) $this->config['max_results']);
 
-        // Optional fleet filters (groups / statuses) configured for the map;
-        // vehicles missing from the fleet list are kept rather than silently
-        // hiding a technician on a data mismatch.
+        // Fleet details (status shown in popups, optional group/status
+        // filters); vehicles missing from the fleet list are kept rather
+        // than silently hiding a technician on a data mismatch.
         $filter_groups   = PluginConfig::decodeListValue($this->config['modal_group']);
         $filter_statuses = PluginConfig::decodeListValue($this->config['modal_status']);
         $fleet_info      = [];
-        if ($filter_groups !== [] || $filter_statuses !== []) {
-            foreach ($this->getVehicles() as $info) {
-                $fleet_info[$info['id']] = $info;
-            }
+        foreach ($this->getVehicles() as $info) {
+            $fleet_info[$info['id']] = $info;
         }
 
         $vehicles = [];
@@ -140,6 +138,7 @@ final class MasternautClient
                 'driver_name'  => $item['driverName'] ?? null,
                 'updated_at'   => $item['date'] ?? null,
                 'event_type'   => $item['eventType'] ?? null,
+                'status'       => $info['status'] ?? null,
             ];
         }
 

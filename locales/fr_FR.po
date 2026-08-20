@@ -292,3 +292,7 @@ msgstr "Seuls les véhicules ayant ces statuts apparaissent dans la modale des t
 #: templates/config_display.html.twig
 msgid "All statuses"
 msgstr "Tous les statuts"
+
+#: src/Controller/MapController.php
+msgid "Available"
+msgstr "Disponible"
