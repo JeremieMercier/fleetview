@@ -33,64 +33,60 @@
 
 <form method="post" action="{{ form_action }}" data-track-changes="true">
     <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token() }}" />
-    <input type="hidden" name="_tab" value="1" />
+    <input type="hidden" name="_tab" value="2" />
 
     <div class="card">
         <div class="card-header">
             <h3 class="card-title">
-                <i class="ti ti-plug me-2"></i>
-                {{ __('Masternaut (Michelin Connected Fleet) API', 'fleetview') }}
+                <i class="ti ti-palette me-2"></i>
+                {{ __('Customization', 'fleetview') }}
             </h3>
         </div>
         <div class="card-body">
-            {{ fields.urlField(
-                'api_base_url',
-                config['api_base_url'],
-                __('API base URL', 'fleetview'),
-                {'full_width': true}
-            ) }}
-
-            {{ fields.textField(
-                'customer_id',
-                config['customer_id'],
-                __('Connect customer number', 'fleetview'),
-                {'full_width': true}
-            ) }}
-
-            {{ fields.textField(
-                'api_username',
-                config['api_username'],
-                __('API username (Connect Partner user)', 'fleetview'),
-                {'full_width': true}
-            ) }}
-
-            {{ fields.passwordField(
-                'api_secret',
-                '',
-                __('API secret', 'fleetview'),
-                {
-                    'full_width': true,
-                    'additional_attributes': {
-                        'autocomplete': 'new-password',
-                        'placeholder': __('Leave empty to keep the current secret', 'fleetview'),
-                    },
-                }
+            {{ fields.numberField(
+                'search_radius',
+                config['search_radius'],
+                __('Search radius (km)', 'fleetview'),
+                {'min': 1, 'max': 500}
             ) }}
 
             {{ fields.numberField(
-                'cache_lifetime',
-                config['cache_lifetime'],
-                __('Positions cache lifetime (seconds)', 'fleetview'),
-                {'min': 0, 'max': 3600}
+                'max_results',
+                config['max_results'],
+                __('Maximum number of vehicles displayed', 'fleetview'),
+                {'min': 1, 'max': 100}
             ) }}
 
-            {{ fields.urlField(
-                'routing_base_url',
-                config['routing_base_url'],
-                __('Routing service URL (OSRM)', 'fleetview'),
+            {{ fields.colorField(
+                'marker_color_ticket',
+                config['marker_color_ticket'],
+                __('Marker color: ticket location', 'fleetview')
+            ) }}
+
+            {{ fields.colorField(
+                'marker_color_top1',
+                config['marker_color_top1'],
+                __('Marker color: closest vehicle', 'fleetview')
+            ) }}
+
+            {{ fields.colorField(
+                'marker_color_top2',
+                config['marker_color_top2'],
+                __('Marker color: 2nd closest', 'fleetview')
+            ) }}
+
+            {{ fields.colorField(
+                'marker_color_top3',
+                config['marker_color_top3'],
+                __('Marker color: 3rd closest', 'fleetview')
+            ) }}
+
+            {{ fields.sliderField(
+                'name_matching_fallback',
+                config['name_matching_fallback'],
+                __('Match technicians by name when a vehicle has no association', 'fleetview'),
                 {
-                    'full_width': true,
-                    'helper': __('Used to estimate driving times; coordinates are sent to this service. Leave empty to disable.', 'fleetview'),
+                    'helper': __('Only useful when vehicles are named after their technician. Explicit associations always take precedence.', 'fleetview'),
                 }
             ) }}
         </div>

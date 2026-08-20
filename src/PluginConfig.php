@@ -151,7 +151,8 @@ final class PluginConfig extends CommonGLPI
         if ($item instanceof self) {
             return [
                 1 => self::createTabEntry(__('API', 'fleetview'), 0, $item::class, 'ti ti-plug'),
-                2 => self::createTabEntry(__('Vehicle to technician associations', 'fleetview'), 0, $item::class, 'ti ti-car'),
+                2 => self::createTabEntry(__('Customization', 'fleetview'), 0, $item::class, 'ti ti-palette'),
+                3 => self::createTabEntry(__('Vehicle to technician associations', 'fleetview'), 0, $item::class, 'ti ti-car'),
             ];
         }
 
@@ -162,7 +163,8 @@ final class PluginConfig extends CommonGLPI
     {
         if ($item instanceof self) {
             match ((int) $tabnum) {
-                2       => self::showMappingsForm(),
+                2       => self::showDisplayForm(),
+                3       => self::showMappingsForm(),
                 default => self::showApiForm(),
             };
             return true;
@@ -187,6 +189,21 @@ final class PluginConfig extends CommonGLPI
 
         TemplateRenderer::getInstance()->display('@fleetview/config_api.html.twig', [
             'config'      => $config,
+            'form_action' => $CFG_GLPI['root_doc'] . '/plugins/fleetview/config',
+        ]);
+    }
+
+    private static function showDisplayForm(): void
+    {
+        /** @var array $CFG_GLPI */
+        global $CFG_GLPI;
+
+        if (!Session::haveRight(self::$rightname, UPDATE)) {
+            return;
+        }
+
+        TemplateRenderer::getInstance()->display('@fleetview/config_display.html.twig', [
+            'config'      => self::getConfig(),
             'form_action' => $CFG_GLPI['root_doc'] . '/plugins/fleetview/config',
         ]);
     }

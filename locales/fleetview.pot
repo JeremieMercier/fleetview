@@ -221,3 +221,7 @@ msgstr ""
 #: src/Controller/ConfigController.php
 msgid "Configuration has been saved."
 msgstr ""
+
+#: src/PluginConfig.php templates/config_display.html.twig
+msgid "Customization"
+msgstr ""

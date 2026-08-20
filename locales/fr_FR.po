@@ -224,3 +224,7 @@ msgstr "API"
 #: src/Controller/ConfigController.php
 msgid "Configuration has been saved."
 msgstr "La configuration a été enregistrée."
+
+#: src/PluginConfig.php templates/config_display.html.twig
+msgid "Customization"
+msgstr "Personnalisation"
