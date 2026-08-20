@@ -37,6 +37,7 @@ use Glpi\Controller\AbstractController;
 use GlpiPlugin\Fleetview\Masternaut\MasternautApiException;
 use GlpiPlugin\Fleetview\Masternaut\MasternautClient;
 use GlpiPlugin\Fleetview\PluginConfig;
+use GlpiPlugin\Fleetview\Routing\OsrmRouter;
 use Location;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -100,6 +101,15 @@ final class MapController extends AbstractController
                 'error'      => $e->getMessage(),
                 'vehicles'   => [],
             ], Response::HTTP_BAD_GATEWAY);
+        }
+
+        // Best-effort driving time estimations; vehicles keep null values
+        // when the routing service is disabled or unavailable.
+        $routes = (new OsrmRouter($config['routing_base_url']))
+            ->getRoutesFromPoint($location['latitude'], $location['longitude'], $vehicles);
+        foreach ($vehicles as $i => &$vehicle) {
+            $vehicle['travel_time_min'] = $routes[$i]['duration_min'] ?? null;
+            $vehicle['road_distance_km'] = $routes[$i]['distance_km'] ?? null;
         }
 
         return new JsonResponse([

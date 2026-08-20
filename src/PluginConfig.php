@@ -81,6 +81,9 @@ final class PluginConfig extends CommonGLPI
             'search_radius'  => '50',  // km around the ticket location (API max: 500)
             'max_results'    => '10',  // maximum number of vehicles returned
             'cache_lifetime' => '60',  // seconds, positions cache (API limit: 1 req/15s)
+            // OSRM-compatible routing service for driving time estimations.
+            // Coordinates are sent to this third-party service; empty = disabled.
+            'routing_base_url' => 'https://router.project-osrm.org',
         ];
     }
 

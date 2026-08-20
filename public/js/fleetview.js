@@ -103,6 +103,14 @@
         document.getElementById('fleetview-alert').className = 'alert m-3 d-none';
     };
 
+    const formatDuration = (minutes) => {
+        if (minutes < 60) {
+            return `${minutes} min`;
+        }
+        const remainder = minutes % 60;
+        return `${Math.floor(minutes / 60)} h ${String(remainder).padStart(2, '0')}`;
+    };
+
     const formatDate = (utcDate) => {
         if (!utcDate) {
             return '';
@@ -193,10 +201,20 @@
 
             const bounds = [[latitude, longitude]];
             located.forEach((vehicle) => {
+                const travel = vehicle.travel_time_min !== null
+                    ? __(
+                        'approx. %1 drive (%2 km by road)',
+                        'fleetview',
+                        formatDuration(vehicle.travel_time_min),
+                        vehicle.road_distance_km
+                    )
+                    : null;
+
                 const details = [
                     `<strong>${_.escape(vehicle.label)}</strong>`,
                     vehicle.driver_name ? `<i class="ti ti-user"></i> ${_.escape(vehicle.driver_name)}` : null,
                     `<i class="ti ti-route"></i> ${_.escape(String(vehicle.distance_km))} km`,
+                    travel ? `<i class="ti ti-car"></i> ${travel}` : null,
                     `<i class="ti ti-clock"></i> ${_.escape(formatDate(vehicle.updated_at))}`,
                 ].filter(Boolean).join('<br>');
 

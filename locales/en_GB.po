@@ -97,3 +97,19 @@ msgstr "No vehicle found within a radius of %s km."
 #: public/js/fleetview.js
 msgid "Unable to fetch vehicle positions."
 msgstr "Unable to fetch vehicle positions."
+
+#: templates/config.html.twig
+msgid "Routing service URL (OSRM)"
+msgstr "Routing service URL (OSRM)"
+
+#: templates/config.html.twig
+msgid ""
+"Used to estimate driving times; coordinates are sent to this service. Leave "
+"empty to disable."
+msgstr ""
+"Used to estimate driving times; coordinates are sent to this service. Leave "
+"empty to disable."
+
+#: public/js/fleetview.js
+msgid "approx. %1 drive (%2 km by road)"
+msgstr "approx. %1 drive (%2 km by road)"

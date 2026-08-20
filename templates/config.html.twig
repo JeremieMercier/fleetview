@@ -98,6 +98,16 @@
                 __('Positions cache lifetime (seconds)', 'fleetview'),
                 {'min': 0, 'max': 3600}
             ) }}
+
+            {{ fields.urlField(
+                'routing_base_url',
+                config['routing_base_url'],
+                __('Routing service URL (OSRM)', 'fleetview'),
+                {
+                    'full_width': true,
+                    'helper': __('Used to estimate driving times; coordinates are sent to this service. Leave empty to disable.', 'fleetview'),
+                }
+            ) }}
         </div>
         <div class="card-footer">
             <button type="submit" name="update" class="btn btn-primary">
