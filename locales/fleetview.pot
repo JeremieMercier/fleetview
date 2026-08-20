@@ -177,3 +177,39 @@ msgstr ""
 #: src/Controller/MapController.php
 msgid "User not found"
 msgstr ""
+
+#: templates/config.html.twig
+msgid "Match technicians by name when a vehicle has no association"
+msgstr ""
+
+#: templates/config.html.twig
+msgid "Only useful when vehicles are named after their technician. Explicit associations below always take precedence."
+msgstr ""
+
+#: templates/config.html.twig
+msgid "Vehicle to technician associations"
+msgstr ""
+
+#: templates/config.html.twig
+msgid "Configure and save the API access above to list the fleet vehicles."
+msgstr ""
+
+#: templates/config.html.twig
+msgid "Associate each Masternaut vehicle with a GLPI user. Rows marked \"suggestion\" are pre-filled from name matching: save to confirm them."
+msgstr ""
+
+#: templates/config.html.twig
+msgid "Vehicle"
+msgstr ""
+
+#: templates/config.html.twig
+msgid "Registration"
+msgstr ""
+
+#: templates/config.html.twig
+msgid "suggestion"
+msgstr ""
+
+#: src/Controller/MappingController.php
+msgid "Vehicle associations have been saved."
+msgstr ""

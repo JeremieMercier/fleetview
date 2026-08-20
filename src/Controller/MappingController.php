@@ -31,31 +31,43 @@
  * -------------------------------------------------------------------------
  */
 
-use GlpiPlugin\Fleetview\PluginConfig;
+namespace GlpiPlugin\Fleetview\Controller;
+
+use Config;
+use Glpi\Controller\AbstractController;
 use GlpiPlugin\Fleetview\VehicleMapping;
+use Session;
+use Symfony\Component\HttpFoundation\RedirectResponse;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Routing\Attribute\Route;
 
 /**
- * Plugin install process
+ * Saves the vehicle to user associations submitted from the plugin
+ * configuration screen. CSRF is enforced by the core CheckCsrfListener
+ * (`_glpi_csrf_token` field of the form).
  */
-function plugin_fleetview_install(): bool
+final class MappingController extends AbstractController
 {
-    $migration = new Migration(PLUGIN_FLEETVIEW_VERSION);
+    #[Route(path: 'mappings', name: 'mappings_save', methods: ['POST'])]
+    public function save(Request $request): RedirectResponse
+    {
+        Session::checkRight(VehicleMapping::$rightname, UPDATE);
 
-    PluginConfig::install();
-    VehicleMapping::install($migration);
+        $mappings = $request->request->all('mappings');
+        $labels   = $request->request->all('labels');
 
-    return true;
-}
+        foreach ($mappings as $asset_id => $users_id) {
+            VehicleMapping::save(
+                (string) $asset_id,
+                (string) ($labels[$asset_id] ?? ''),
+                (int) $users_id
+            );
+        }
 
-/**
- * Plugin uninstall process
- */
-function plugin_fleetview_uninstall(): bool
-{
-    $migration = new Migration(PLUGIN_FLEETVIEW_VERSION);
+        Session::addMessageAfterRedirect(__('Vehicle associations have been saved.', 'fleetview'));
 
-    PluginConfig::uninstall();
-    VehicleMapping::uninstall($migration);
-
-    return true;
+        return new RedirectResponse(
+            Config::getFormURL() . '?forcetab=' . urlencode('GlpiPlugin\Fleetview\PluginConfig$1')
+        );
+    }
 }

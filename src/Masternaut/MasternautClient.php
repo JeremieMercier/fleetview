@@ -165,6 +165,46 @@ final class MasternautClient
     }
 
     /**
+     * Every vehicle of the fleet (List Vehicle endpoint), for the vehicle to
+     * user association screen. Cached 10 minutes.
+     *
+     * @return list<array{id: string, name: string, registration: string}>
+     *
+     * @throws MasternautApiException
+     */
+    public function getVehicles(): array
+    {
+        /** @var CacheInterface $GLPI_CACHE */
+        global $GLPI_CACHE;
+
+        $cache_key = 'fleetview_vehicles_' . md5($this->config['customer_id'] . $this->config['api_username']);
+
+        $vehicles = $GLPI_CACHE->get($cache_key);
+        if (is_array($vehicles)) {
+            return $vehicles;
+        }
+
+        $response = $this->request('vehicle');
+        $items    = is_array($response) ? ($response['items'] ?? []) : [];
+
+        $vehicles = [];
+        foreach ($items as $item) {
+            if (!is_array($item) || !isset($item['id'])) {
+                continue;
+            }
+            $vehicles[] = [
+                'id'           => (string) $item['id'],
+                'name'         => (string) ($item['name'] ?? ''),
+                'registration' => (string) ($item['registration'] ?? ''),
+            ];
+        }
+
+        $GLPI_CACHE->set($cache_key, $vehicles, 600);
+
+        return $vehicles;
+    }
+
+    /**
      * Great-circle distance between two points, in kilometers.
      */
     private static function haversineKm(float $lat1, float $lng1, float $lat2, float $lng2): float

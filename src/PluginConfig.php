@@ -37,6 +37,8 @@ use CommonGLPI;
 use Config;
 use Glpi\Application\View\TemplateRenderer;
 use GLPIKey;
+use GlpiPlugin\Fleetview\Masternaut\MasternautApiException;
+use GlpiPlugin\Fleetview\Masternaut\MasternautClient;
 use Session;
 
 /**
@@ -84,6 +86,10 @@ final class PluginConfig extends CommonGLPI
             // OSRM-compatible routing service for driving time estimations.
             // Coordinates are sent to this third-party service; empty = disabled.
             'routing_base_url' => 'https://router.project-osrm.org',
+            // Fall back on name matching (vehicle/driver name vs GLPI users)
+            // when a vehicle has no explicit association. Off by default:
+            // it only makes sense when vehicles are named after technicians.
+            'name_matching_fallback' => '0',
             // Ticket location marker color
             'marker_color_ticket' => '#d63939',
             // Vehicle marker colors by proximity rank (road ranking); other
@@ -153,18 +159,45 @@ final class PluginConfig extends CommonGLPI
 
     private static function showConfigForm(): void
     {
+        /** @var array $CFG_GLPI */
+        global $CFG_GLPI;
+
         if (!Session::haveRight(self::$rightname, UPDATE)) {
             return;
         }
 
         $config = self::getConfig();
 
+        // Vehicle to user associations, with name-matching suggestions for
+        // vehicles that are not associated yet.
+        $vehicles       = [];
+        $vehicles_error = null;
+        $client         = new MasternautClient($config);
+        if ($client->isConfigured()) {
+            try {
+                $mappings = VehicleMapping::getMap();
+                $matcher  = new TechnicianMatcher();
+                foreach ($client->getVehicles() as $vehicle) {
+                    $users_id = $mappings[$vehicle['id']] ?? 0;
+                    $vehicles[] = $vehicle + [
+                        'users_id'     => $users_id,
+                        'suggested_id' => $users_id === 0 ? ($matcher->match($vehicle['name']) ?? 0) : 0,
+                    ];
+                }
+            } catch (MasternautApiException $e) {
+                $vehicles_error = $e->getMessage();
+            }
+        }
+
         // Never expose the stored secret in the page source
         $config['api_secret'] = '';
 
         TemplateRenderer::getInstance()->display('@fleetview/config.html.twig', [
-            'config'      => $config,
-            'form_action' => Config::getFormURL(),
+            'config'          => $config,
+            'form_action'     => Config::getFormURL(),
+            'vehicles'        => $vehicles,
+            'vehicles_error'  => $vehicles_error,
+            'mappings_action' => $CFG_GLPI['root_doc'] . '/plugins/fleetview/mappings',
         ]);
     }
 

@@ -40,6 +40,7 @@ use GlpiPlugin\Fleetview\Masternaut\MasternautClient;
 use GlpiPlugin\Fleetview\PluginConfig;
 use GlpiPlugin\Fleetview\Routing\OsrmRouter;
 use GlpiPlugin\Fleetview\TechnicianMatcher;
+use GlpiPlugin\Fleetview\VehicleMapping;
 use Location;
 use Ticket_User;
 use User;
@@ -130,13 +131,18 @@ final class MapController extends AbstractController
         usort($vehicles, static fn(array $a, array $b) => ($a['travel_time_min'] ?? PHP_INT_MAX) <=> ($b['travel_time_min'] ?? PHP_INT_MAX)
             ?: $a['distance_km'] <=> $b['distance_km']);
 
-        // Link vehicles to GLPI users so they can be assigned from the modal
+        // Link vehicles to GLPI users so they can be assigned from the modal:
+        // explicit associations first, optional name matching as fallback.
         $can_assign = $ticket->canAssign();
-        $matcher    = new TechnicianMatcher();
+        $mappings   = $can_assign ? VehicleMapping::getMap() : [];
+        $matcher    = $config['name_matching_fallback'] ? new TechnicianMatcher() : null;
         foreach ($vehicles as &$vehicle) {
-            $user_id = $can_assign
-                ? ($matcher->match($vehicle['label']) ?? $matcher->match($vehicle['driver_name']))
-                : null;
+            $user_id = null;
+            if ($can_assign) {
+                $user_id = $mappings[$vehicle['id']]
+                    ?? $matcher?->match($vehicle['label'])
+                    ?? $matcher?->match($vehicle['driver_name']);
+            }
             $vehicle['user_id'] = $user_id;
         }
         unset($vehicle);
