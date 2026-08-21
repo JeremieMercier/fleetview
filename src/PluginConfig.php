@@ -105,6 +105,9 @@ final class PluginConfig extends CommonGLPI
             'marker_color_top1' => '#2fb344', // closest vehicle
             'marker_color_top2' => '#f59f00', // 2nd closest
             'marker_color_top3' => '#ae3ec9', // 3rd closest
+            // Planned interventions (ticket tasks) listed in the vehicle
+            // marker popup; 0 = section hidden
+            'popup_max_tasks' => '6',
         ];
     }
 

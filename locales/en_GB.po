@@ -319,3 +319,41 @@ msgstr "All statuses"
 #: src/Controller/MapController.php
 msgid "Available"
 msgstr "Available"
+
+#: templates/config_display.html.twig
+msgid "Planned interventions listed in the marker popup"
+msgstr "Planned interventions listed in the marker popup"
+
+#: templates/config_display.html.twig
+msgid "Upcoming ticket tasks of the linked technician. 0 hides the section."
+msgstr "Upcoming ticket tasks of the linked technician. 0 hides the section."
+
+#: public/js/fleetview.js
+msgid "Planned interventions"
+msgstr "Planned interventions"
+
+#: public/js/fleetview.js
+msgid "Vehicle not linked to a GLPI user"
+msgstr "Vehicle not linked to a GLPI user"
+
+#: public/js/fleetview.js
+msgid "No planned intervention"
+msgstr "No planned intervention"
+
+#: public/js/fleetview.js
+msgid "in progress"
+msgstr "in progress"
+
+#: public/js/fleetview.js
+msgid "+ %1 other"
+msgid_plural "+ %1 others"
+msgstr[0] "+ %1 other"
+msgstr[1] "+ %1 others"
+
+#: public/js/fleetview.js
+msgid "today"
+msgstr "today"
+
+#: public/js/fleetview.js
+msgid "tomorrow"
+msgstr "tomorrow"

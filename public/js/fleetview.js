@@ -188,6 +188,44 @@
         return Number.isNaN(date.getTime()) ? utcDate : date.toLocaleString();
     };
 
+    // Planned interventions section of a vehicle popup: upcoming ticket
+    // tasks of the linked technician, or why there is nothing to show.
+    const plannedTasksHtml = (vehicle, warningColor) => {
+        const title = `<span class="fleetview-tasks-title"><i class="ti ti-calendar-event"></i> ${__('Planned interventions', 'fleetview')}</span>`;
+
+        if (!vehicle.technician_linked) {
+            return `${title}<br><span class="text-muted">${__('Vehicle not linked to a GLPI user', 'fleetview')}</span>`;
+        }
+
+        const tasks = vehicle.planned_tasks || [];
+        if (tasks.length === 0) {
+            return `${title}<br><span class="text-muted">${__('No planned intervention', 'fleetview')}</span>`;
+        }
+
+        const items = tasks.map((task) => {
+            // One hint per task: in progress (warning color), then today
+            // (same warning), then tomorrow (neutral)
+            let badge = '';
+            if (task.in_progress) {
+                badge = ` <span class="badge fleetview-task-badge" style="background:${_.escape(warningColor)}">${__('in progress', 'fleetview')}</span>`;
+            } else if (task.day === 'today') {
+                badge = ` <span class="badge fleetview-task-badge" style="background:${_.escape(warningColor)}">${__('today', 'fleetview')}</span>`;
+            } else if (task.day === 'tomorrow') {
+                badge = ` <span class="badge fleetview-task-badge bg-secondary-lt">${__('tomorrow', 'fleetview')}</span>`;
+            }
+            const when = _.escape(task.when_label) + badge;
+            const label = `#${task.tickets_id} ${_.escape(task.ticket_name)}`;
+            return `<li><span class="fleetview-task-date">${when}</span>`
+                + `<a href="${_.escape(task.url)}" target="_blank" rel="noopener" title="${label}">${label}</a></li>`;
+        });
+
+        const more = vehicle.planned_tasks_more > 0
+            ? `<li class="text-muted">${_n('+ %1 other', '+ %1 others', vehicle.planned_tasks_more, 'fleetview', vehicle.planned_tasks_more)}</li>`
+            : '';
+
+        return `${title}<ul class="fleetview-tasks">${items.join('')}${more}</ul>`;
+    };
+
     // Native Leaflet marker recolored for the ticket location (configured
     // color, red by default) so it stays visually consistent with the
     // vehicle markers.
@@ -379,12 +417,13 @@
                     `<i class="ti ti-route"></i> ${__('%1 km as the crow flies', 'fleetview', vehicle.distance_km)}`,
                     travel ? `<i class="ti ti-car"></i> ${travel}` : null,
                     `<i class="ti ti-clock"></i> ${_.escape(formatDate(vehicle.updated_at))}`,
+                    data.max_tasks > 0 ? plannedTasksHtml(vehicle, data.warning_color) : null,
                     assign,
                 ].filter(Boolean).join('<br>');
 
                 const marker = L.marker([vehicle.latitude, vehicle.longitude])
                     .addTo(vehiclesLayer)
-                    .bindPopup(details);
+                    .bindPopup(details, { maxWidth: 360 });
                 const color = rankColor(index, data.marker_colors);
                 if (color !== null) {
                     marker.getElement().style.filter = markerFilter(color);

@@ -33,6 +33,7 @@
 
 namespace GlpiPlugin\Fleetview\Tests;
 
+use Html;
 use CommonITILActor;
 use Config;
 use Entity;
@@ -47,9 +48,11 @@ use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Response;
 use Location;
+use Planning;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Ticket;
+use TicketTask;
 use Ticket_User;
 use User;
 
@@ -97,6 +100,33 @@ final class MapControllerTest extends DbTestCase
         $this->assertGreaterThan(0, $id);
 
         return $ticket;
+    }
+
+    /**
+     * Planned task of a technician on a ticket, offset in hours from now
+     * (negative = already started / over).
+     */
+    private function createPlannedTask(Ticket $ticket, int $users_id_tech, int $begin_hours, int $end_hours, array $extra = []): int
+    {
+        global $DB;
+
+        // Offsets from the database clock: "in progress" and "over" are
+        // decided by MySQL, whose timezone may differ from PHP's
+        $now = $DB->doQuery('SELECT NOW() AS now')->fetch_assoc()['now'] ?? null;
+        $this->assertIsString($now);
+
+        $task = new TicketTask();
+        $id   = $task->add($extra + [
+            'tickets_id'    => $ticket->getID(),
+            'content'       => 'Intervention fictive',
+            'users_id_tech' => $users_id_tech,
+            'begin'         => date('Y-m-d H:i:s', strtotime(sprintf('%s %+d hours', $now, $begin_hours))),
+            'end'           => date('Y-m-d H:i:s', strtotime(sprintf('%s %+d hours', $now, $end_hours))),
+            'state'         => Planning::TODO,
+        ]);
+        $this->assertGreaterThan(0, $id);
+
+        return $id;
     }
 
     /**
@@ -414,5 +444,169 @@ final class MapControllerTest extends DbTestCase
 
         $this->assertFalse($payload['can_assign']);
         $this->assertSame([null, null], array_column($payload['vehicles'], 'user_id'));
+        // The link itself is still reported: it drives the planned interventions
+        $this->assertSame([true, false], array_column($payload['vehicles'], 'technician_linked'));
+    }
+
+    public function testTicketVehiclesListsPlannedTasksOfLinkedTechnicians(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi(['popup_max_tasks' => '2']);
+        $ticket  = $this->createTicket($this->createGeoLocation()->getID());
+        $tech_id = getItemByTypeName(User::class, 'tech', true);
+        VehicleMapping::save('202', 'Martin Sophie', $tech_id);
+
+        $job    = $this->createTicket();
+        $other  = $this->createTicket();
+        $closed = $this->createTicket();
+
+        $in_progress = $this->createPlannedTask($job, $tech_id, -1, 1);
+        $tomorrow    = $this->createPlannedTask($other, $tech_id, 24, 26);
+        $this->createPlannedTask($job, $tech_id, 48, 50);            // beyond the limit
+        $this->createPlannedTask($job, $tech_id, -48, -46);          // over
+        $this->createPlannedTask($job, $tech_id, 72, 74, ['state' => Planning::DONE]);
+        $this->createPlannedTask($closed, $tech_id, 96, 98);
+        $this->assertTrue($closed->update(['id' => $closed->getID(), 'status' => Ticket::CLOSED]));
+
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $this->assertSame(2, $payload['max_tasks']);
+        $this->assertMatchesRegularExpression('/^#[0-9a-fA-F]{6}$/', $payload['warning_color']);
+
+        [$linked, $unlinked] = $payload['vehicles'];
+        $this->assertSame('202', $linked['id']);
+        $this->assertTrue($linked['technician_linked']);
+        $this->assertSame([$in_progress, $tomorrow], array_column($linked['planned_tasks'], 'id'));
+        $this->assertSame(1, $linked['planned_tasks_more']);
+
+        $first = $linked['planned_tasks'][0];
+        $this->assertTrue($first['in_progress']);
+        $this->assertContains($first['day'], ['today', null]); // started an hour ago: today, or yesterday around midnight
+        $this->assertSame($job->getID(), $first['tickets_id']);
+        $this->assertSame('Ticket test fictif', $first['ticket_name']);
+        $this->assertStringContainsString('ticket.form.php?id=' . $job->getID(), $first['url']);
+        $this->assertNotSame('', $first['begin_label']);
+        $this->assertFalse($linked['planned_tasks'][1]['in_progress']);
+
+        // Single-day task: "begin – HH:MM"; the end time is the label's tail
+        $next = $linked['planned_tasks'][1];
+        $this->assertSame($next['begin_label'] . ' – ' . substr($next['end_label'], -5), $next['when_label']);
+
+        $this->assertFalse($unlinked['technician_linked']);
+        $this->assertSame([], $unlinked['planned_tasks']);
+        $this->assertSame(0, $unlinked['planned_tasks_more']);
+    }
+
+    public function testTicketVehiclesHidesPrivateTasksFromOtherUsers(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi();
+        $requester_id = getItemByTypeName(User::class, 'post-only', true);
+        $ticket  = $this->createTicket($this->createGeoLocation()->getID(), $requester_id);
+        $tech_id = getItemByTypeName(User::class, 'tech', true);
+        VehicleMapping::save('202', 'Martin Sophie', $tech_id);
+
+        $job    = $this->createTicket();
+        $public = $this->createPlannedTask($job, $tech_id, 24, 26);
+        $this->createPlannedTask($job, $tech_id, 48, 50, ['is_private' => 1]);
+
+        $this->login('post-only');
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+
+        $this->assertSame([$public], array_column($payload['vehicles'][0]['planned_tasks'], 'id'));
+    }
+
+    public function testTicketVehiclesLabelsMultiDayTasksWithBothDates(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi();
+        $ticket  = $this->createTicket($this->createGeoLocation()->getID());
+        $tech_id = getItemByTypeName(User::class, 'tech', true);
+        VehicleMapping::save('202', 'Martin Sophie', $tech_id);
+        $this->createPlannedTask($this->createTicket(), $tech_id, 24, 72);
+
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $task    = $payload['vehicles'][0]['planned_tasks'][0];
+
+        $this->assertSame($task['begin_label'] . ' – ' . $task['end_label'], $task['when_label']);
+    }
+
+    public function testTicketVehiclesLabelsFullDayTasksWithDatesOnly(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi();
+        $ticket  = $this->createTicket($this->createGeoLocation()->getID());
+        $tech_id = getItemByTypeName(User::class, 'tech', true);
+        VehicleMapping::save('202', 'Martin Sophie', $tech_id);
+
+        $job  = $this->createTicket();
+        $task = new TicketTask();
+        $base = [
+            'tickets_id'    => $job->getID(),
+            'content'       => 'Journée entière fictive',
+            'users_id_tech' => $tech_id,
+            'state'         => Planning::TODO,
+        ];
+        $one_day   = $task->add($base + ['begin' => '2030-03-10 00:00:00', 'end' => '2030-03-10 23:59:59']);
+        $several   = $task->add($base + ['begin' => '2030-04-01 00:00:00', 'end' => '2030-04-03 23:59:59']);
+        $midnight  = $task->add($base + ['begin' => '2030-05-01 00:00:00', 'end' => '2030-05-03 00:00:00']);
+        $this->assertGreaterThan(0, min($one_day, $several, $midnight));
+
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $labels  = array_column($payload['vehicles'][0]['planned_tasks'], 'when_label', 'id');
+
+        $this->assertSame([null, null, null], array_column($payload['vehicles'][0]['planned_tasks'], 'day'));
+        $this->assertSame(Html::convDate('2030-03-10'), $labels[$one_day]);
+        $this->assertSame(Html::convDate('2030-04-01') . ' – ' . Html::convDate('2030-04-03'), $labels[$several]);
+        $this->assertSame(Html::convDate('2030-05-01') . ' – ' . Html::convDate('2030-05-02'), $labels[$midnight]);
+    }
+
+    public function testTicketVehiclesFlagsTasksOfTodayAndTomorrow(): void
+    {
+        global $DB;
+
+        $this->login('glpi');
+        $this->configurePluginApi();
+        $ticket  = $this->createTicket($this->createGeoLocation()->getID());
+        $tech_id = getItemByTypeName(User::class, 'tech', true);
+        VehicleMapping::save('202', 'Martin Sophie', $tech_id);
+
+        $today = $DB->doQuery('SELECT CURDATE() AS today')->fetch_assoc()['today'] ?? null;
+        $this->assertIsString($today);
+
+        $job  = $this->createTicket();
+        $task = new TicketTask();
+        $base = [
+            'tickets_id'    => $job->getID(),
+            'content'       => 'Intervention fictive',
+            'users_id_tech' => $tech_id,
+            'state'         => Planning::TODO,
+        ];
+        $day = static fn(int $offset, string $time): string => date('Y-m-d', strtotime(sprintf('%s +%d day', $today, $offset))) . ' ' . $time;
+        $tonight   = $task->add($base + ['begin' => $day(0, '23:58:00'), 'end' => $day(0, '23:59:00')]);
+        $tomorrow  = $task->add($base + ['begin' => $day(1, '09:00:00'), 'end' => $day(1, '10:00:00')]);
+        $later     = $task->add($base + ['begin' => $day(2, '09:00:00'), 'end' => $day(2, '10:00:00')]);
+        $this->assertGreaterThan(0, min($tonight, $tomorrow, $later));
+
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $days    = array_column($payload['vehicles'][0]['planned_tasks'], 'day', 'id');
+
+        $this->assertSame('today', $days[$tonight]);
+        $this->assertSame('tomorrow', $days[$tomorrow]);
+        $this->assertNull($days[$later]);
+    }
+
+    public function testTicketVehiclesSkipsPlannedTasksWhenDisabled(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi(['popup_max_tasks' => '0']);
+        $ticket  = $this->createTicket($this->createGeoLocation()->getID());
+        $tech_id = getItemByTypeName(User::class, 'tech', true);
+        VehicleMapping::save('202', 'Martin Sophie', $tech_id);
+        $this->createPlannedTask($this->createTicket(), $tech_id, 24, 26);
+
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+
+        $this->assertSame(0, $payload['max_tasks']);
+        $this->assertSame([null, null], array_column($payload['vehicles'], 'planned_tasks'));
     }
 }
