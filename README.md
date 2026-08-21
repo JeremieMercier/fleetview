@@ -9,6 +9,13 @@ dispose de coordonnées GPS. Il ouvre une modale avec une carte (Leaflet,
 embarqué dans GLPI) centrée sur la localisation du demandeur et affichant la
 position des véhicules de la flotte.
 
+La bulle de chaque véhicule indique la distance à vol d'oiseau, le temps et
+la distance par la route (OSRM), et le **planning à venir** du technicien
+associé : tâches de tickets planifiées et événements externes (congés,
+réservations…), triés chronologiquement, avec un badge « en cours »,
+« aujourd'hui » ou « demain ». Les droits GLPI s'appliquent (tâches privées,
+visibilité du planning, entités).
+
 ## Prérequis
 
 - GLPI >= 11.0
@@ -46,6 +53,11 @@ php bin/console glpi:plugin:activate fleetview
 Connect, utilisateur Partner (HTTP Basic) et secret de l'API, rayon de
 recherche, nombre de véhicules et durée du cache. Le secret est chiffré en
 base via GLPIKey (hook `secured_configs`) et n'apparaît jamais dans le dépôt.
+
+Onglet *Affichage* : couleurs des marqueurs, filtres, nombre d'entrées du
+planning listées dans la bulle (`0` masque la section) et prise en compte des
+événements externes (activée par défaut ; les événements récurrents ne sont
+pas développés).
 
 L'API « Live Position Latest » est limitée à 1 requête / 15 s : les positions
 sont mises en cache côté serveur (cache GLPI, durée configurable, minimum
