@@ -121,7 +121,7 @@ final class TechnicianAgenda
             'ORDER'      => [$task_tbl . '.begin ASC', $task_tbl . '.id ASC'],
         ]);
 
-        /** @var array<int, array{tasks: list<array{id: int, tickets_id: int, ticket_name: string, url: string, begin: string, end: string, begin_label: string, end_label: string, in_progress: bool}>, more: int}> $agenda */
+        /** @var array<int, array{tasks: list<array{id: int, tickets_id: int, ticket_name: string, url: string, begin: string, end: string, begin_label: string, end_label: string, when_label: string, in_progress: bool}>, more: int}> $agenda */
         $agenda = [];
         foreach ($iterator as $row) {
             if (
@@ -144,9 +144,11 @@ final class TechnicianAgenda
                 continue;
             }
 
-            $tickets_id = (int) $row['tickets_id'];
-            $begin      = (string) $row['begin'];
-            $end        = (string) $row['end'];
+            $tickets_id  = (int) $row['tickets_id'];
+            $begin       = (string) $row['begin'];
+            $end         = (string) $row['end'];
+            $begin_label = (string) Html::convDateTime($begin);
+            $end_label   = (string) Html::convDateTime($end);
 
             $entry['tasks'][] = [
                 'id'          => (int) $row['id'],
@@ -155,8 +157,12 @@ final class TechnicianAgenda
                 'url'         => Ticket::getFormURLWithID($tickets_id, true),
                 'begin'       => $begin,
                 'end'         => $end,
-                'begin_label' => (string) Html::convDateTime($begin),
-                'end_label'   => (string) Html::convDateTime($end),
+                'begin_label' => $begin_label,
+                'end_label'   => $end_label,
+                // "date begin – end" on a single day, full dates otherwise
+                'when_label'  => substr($begin, 0, 10) === substr($end, 0, 10)
+                    ? $begin_label . ' – ' . substr($end_label, -5)
+                    : $begin_label . ' – ' . $end_label,
                 'in_progress' => (bool) ($row['in_progress'] ?? false),
             ];
             $agenda[$users_id] = $entry;

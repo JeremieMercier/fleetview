@@ -485,6 +485,10 @@ final class MapControllerTest extends DbTestCase
         $this->assertNotSame('', $first['begin_label']);
         $this->assertFalse($linked['planned_tasks'][1]['in_progress']);
 
+        // Single-day task: "begin – HH:MM"; the end time is the label's tail
+        $next = $linked['planned_tasks'][1];
+        $this->assertSame($next['begin_label'] . ' – ' . substr($next['end_label'], -5), $next['when_label']);
+
         $this->assertFalse($unlinked['technician_linked']);
         $this->assertSame([], $unlinked['planned_tasks']);
         $this->assertSame(0, $unlinked['planned_tasks_more']);
@@ -507,6 +511,21 @@ final class MapControllerTest extends DbTestCase
         $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
 
         $this->assertSame([$public], array_column($payload['vehicles'][0]['planned_tasks'], 'id'));
+    }
+
+    public function testTicketVehiclesLabelsMultiDayTasksWithBothDates(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi();
+        $ticket  = $this->createTicket($this->createGeoLocation()->getID());
+        $tech_id = getItemByTypeName(User::class, 'tech', true);
+        VehicleMapping::save('202', 'Martin Sophie', $tech_id);
+        $this->createPlannedTask($this->createTicket(), $tech_id, 24, 72);
+
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $task    = $payload['vehicles'][0]['planned_tasks'][0];
+
+        $this->assertSame($task['begin_label'] . ' – ' . $task['end_label'], $task['when_label']);
     }
 
     public function testTicketVehiclesSkipsPlannedTasksWhenDisabled(): void

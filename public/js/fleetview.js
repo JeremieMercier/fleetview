@@ -203,9 +203,10 @@
         }
 
         const items = tasks.map((task) => {
-            const when = task.in_progress
-                ? `${_.escape(task.end_label)} <span class="badge" style="background:${_.escape(warningColor)}">${__('in progress', 'fleetview')}</span>`
-                : _.escape(task.begin_label);
+            const badge = task.in_progress
+                ? ` <span class="badge" style="background:${_.escape(warningColor)}">${__('in progress', 'fleetview')}</span>`
+                : '';
+            const when = _.escape(task.when_label) + badge;
             const label = `#${task.tickets_id} ${_.escape(task.ticket_name)}`;
             return `<li><span class="fleetview-task-date">${when}</span>`
                 + `<a href="${_.escape(task.url)}" target="_blank" rel="noopener" title="${label}">${label}</a></li>`;
