@@ -59,6 +59,7 @@ final class PluginConfigTest extends TestCase
         // after their technician
         $this->assertSame('0', $defaults['name_matching_fallback']);
         $this->assertSame('6', $defaults['popup_max_tasks']);
+        $this->assertSame('1', $defaults['popup_external_events']);
 
         // Map filters are disabled by default
         $this->assertSame('', $defaults['modal_group']);

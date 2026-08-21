@@ -190,8 +190,9 @@
 
     // Planned interventions section of a vehicle popup: upcoming ticket
     // tasks of the linked technician, or why there is nothing to show.
-    const plannedTasksHtml = (vehicle, warningColor) => {
-        const title = `<span class="fleetview-tasks-title"><i class="ti ti-calendar-event"></i> ${__('Planned interventions', 'fleetview')}</span>`;
+    const plannedTasksHtml = (vehicle, warningColor, withEvents) => {
+        const heading = withEvents ? __('Planned interventions and events', 'fleetview') : __('Planned interventions', 'fleetview');
+        const title = `<span class="fleetview-tasks-title"><i class="ti ti-calendar-event"></i> ${heading}</span>`;
 
         if (!vehicle.technician_linked) {
             return `${title}<br><span class="text-muted">${__('Vehicle not linked to a GLPI user', 'fleetview')}</span>`;
@@ -214,9 +215,19 @@
                 badge = ` <span class="badge fleetview-task-badge bg-secondary-lt">${__('tomorrow', 'fleetview')}</span>`;
             }
             const when = _.escape(task.when_label) + badge;
-            const label = `#${task.tickets_id} ${_.escape(task.ticket_name)}`;
+            let label;
+            if (task.type === 'event') {
+                // External event: category color dot, category and title
+                const dot = task.color
+                    ? `<span class="fleetview-dot" style="background:${_.escape(task.color)}"></span> `
+                    : '<i class="ti ti-calendar-off"></i> ';
+                const text = [task.category, task.ticket_name].filter(Boolean).map(_.escape).join(' : ');
+                label = `${dot}${text}`;
+            } else {
+                label = `#${task.tickets_id} ${_.escape(task.ticket_name)}`;
+            }
             return `<li><span class="fleetview-task-date">${when}</span>`
-                + `<a href="${_.escape(task.url)}" target="_blank" rel="noopener" title="${label}">${label}</a></li>`;
+                + `<a href="${_.escape(task.url)}" target="_blank" rel="noopener">${label}</a></li>`;
         });
 
         const more = vehicle.planned_tasks_more > 0
@@ -417,7 +428,7 @@
                     `<i class="ti ti-route"></i> ${__('%1 km as the crow flies', 'fleetview', vehicle.distance_km)}`,
                     travel ? `<i class="ti ti-car"></i> ${travel}` : null,
                     `<i class="ti ti-clock"></i> ${_.escape(formatDate(vehicle.updated_at))}`,
-                    data.max_tasks > 0 ? plannedTasksHtml(vehicle, data.warning_color) : null,
+                    data.max_tasks > 0 ? plannedTasksHtml(vehicle, data.warning_color, data.with_events) : null,
                     assign,
                 ].filter(Boolean).join('<br>');
 

@@ -357,3 +357,15 @@ msgstr "today"
 #: public/js/fleetview.js
 msgid "tomorrow"
 msgstr "tomorrow"
+
+#: templates/config_display.html.twig
+msgid "Also list external events (leaves, reservations...)"
+msgstr "Also list external events (leaves, reservations...)"
+
+#: templates/config_display.html.twig
+msgid "Events the technician owns or is invited to, merged with the tasks. GLPI planning rights apply."
+msgstr "Events the technician owns or is invited to, merged with the tasks. GLPI planning rights apply."
+
+#: public/js/fleetview.js
+msgid "Planned interventions and events"
+msgstr "Planned interventions and events"

@@ -38,6 +38,8 @@ use Glpi\DBAL\QueryExpression;
 use Glpi\DBAL\QueryFunction;
 use Html;
 use Planning;
+use PlanningEventCategory;
+use PlanningExternalEvent;
 use Session;
 use Ticket;
 use TicketTask;
@@ -45,40 +47,82 @@ use TicketTask;
 use function Safe\strtotime;
 
 /**
- * Planned interventions (ticket tasks) of technicians, displayed in the
- * vehicle marker popup of the map. Only "to do" tasks with a planning that
- * is not over yet, on open tickets visible from the current entities.
+ * Upcoming schedule of technicians, displayed in the vehicle marker popup
+ * of the map: planned ticket tasks ("to do", not over yet, on open tickets
+ * visible from the current entities) merged chronologically with their
+ * external events (leaves, reservations... owned or as a guest, visible
+ * according to the core planning rights).
  */
 final class TechnicianAgenda
 {
     /**
-     * Planned tasks of the given users, soonest first, at most `$limit` per
-     * user. Private tasks are only included when the current user may see
-     * them (right, author or technician).
+     * Upcoming entries of the given users, soonest first, at most `$limit`
+     * per user. Private tasks are only included when the current user may
+     * see them (right, author or technician); external events follow the
+     * core visibility rules (own, guest, or planning "see all"/"see group").
      *
      * @param list<int> $users_ids
      *
      * @return array<int, array{tasks: list<array{
+     *      type: 'task'|'event',
      *      id: int,
      *      tickets_id: int,
      *      ticket_name: string,
+     *      category: string,
+     *      color: string,
      *      url: string,
      *      begin: string,
      *      end: string,
      *      begin_label: string,
      *      end_label: string,
+     *      when_label: string,
      *      in_progress: bool,
-     * }>, more: int}> users_id => tasks; users without tasks are absent
+     *      day: ?string,
+     * }>, more: int}> users_id => entries; users without entries are absent
      */
-    public static function getPlannedTasks(array $users_ids, int $limit): array
+    public static function getPlannedTasks(array $users_ids, int $limit, bool $with_events = false): array
     {
-        /** @var DBmysql $DB */
-        global $DB;
-
         $users_ids = array_values(array_unique(array_filter($users_ids, static fn(int $id) => $id > 0)));
         if ($users_ids === [] || $limit <= 0) {
             return [];
         }
+
+        $entries = self::fetchTasks($users_ids);
+        if ($with_events) {
+            $entries = array_merge($entries, self::fetchEvents($users_ids));
+        }
+
+        usort($entries, static fn(array $a, array $b) => [$a['begin'], $a['type'], $a['id']] <=> [$b['begin'], $b['type'], $b['id']]);
+
+        /** @var array<int, array{tasks: list<array{type: 'task'|'event', id: int, tickets_id: int, ticket_name: string, category: string, color: string, url: string, begin: string, end: string, begin_label: string, end_label: string, when_label: string, in_progress: bool, day: ?string}>, more: int}> $agenda */
+        $agenda = [];
+        foreach ($entries as $entry) {
+            $users_id = $entry['users_id'];
+            unset($entry['users_id']);
+
+            $agenda[$users_id] ??= ['tasks' => [], 'more' => 0];
+            if (count($agenda[$users_id]['tasks']) >= $limit) {
+                $agenda[$users_id]['more']++;
+                continue;
+            }
+
+            $agenda[$users_id]['tasks'][] = $entry;
+        }
+
+        return $agenda;
+    }
+
+    /**
+     * Planned ticket tasks of the users, one entry per task.
+     *
+     * @param list<int> $users_ids
+     *
+     * @return list<array{users_id: int, type: 'task', id: int, tickets_id: int, ticket_name: string, category: string, color: string, url: string, begin: string, end: string, begin_label: string, end_label: string, when_label: string, in_progress: bool, day: ?string}>
+     */
+    private static function fetchTasks(array $users_ids): array
+    {
+        /** @var DBmysql $DB */
+        global $DB;
 
         $me       = Session::getLoginUserID();
         $task_tbl = TicketTask::getTable();
@@ -124,8 +168,7 @@ final class TechnicianAgenda
             'ORDER'      => [$task_tbl . '.begin ASC', $task_tbl . '.id ASC'],
         ]);
 
-        /** @var array<int, array{tasks: list<array{id: int, tickets_id: int, ticket_name: string, url: string, begin: string, end: string, begin_label: string, end_label: string, when_label: string, in_progress: bool, day: ?string}>, more: int}> $agenda */
-        $agenda = [];
+        $entries = [];
         foreach ($iterator as $row) {
             if (
                 !is_array($row)
@@ -138,43 +181,144 @@ final class TechnicianAgenda
                 continue;
             }
 
-            $users_id = (int) $row['users_id_tech'];
-            $entry    = $agenda[$users_id] ?? ['tasks' => [], 'more' => 0];
-
-            if (count($entry['tasks']) >= $limit) {
-                $entry['more']++;
-                $agenda[$users_id] = $entry;
-                continue;
-            }
-
-            $tickets_id  = (int) $row['tickets_id'];
-            $begin       = (string) $row['begin'];
-            $end         = (string) $row['end'];
-            $begin_label = (string) Html::convDateTime($begin);
-            $end_label   = (string) Html::convDateTime($end);
-
-            $entry['tasks'][] = [
+            $tickets_id = (int) $row['tickets_id'];
+            $entries[]  = [
+                'users_id'    => (int) $row['users_id_tech'],
+                'type'        => 'task',
                 'id'          => (int) $row['id'],
                 'tickets_id'  => $tickets_id,
                 'ticket_name' => is_scalar($row['ticket_name'] ?? null) ? (string) $row['ticket_name'] : '',
+                'category'    => '',
+                'color'       => '',
                 'url'         => Ticket::getFormURLWithID($tickets_id, true),
-                'begin'       => $begin,
-                'end'         => $end,
-                'begin_label' => $begin_label,
-                'end_label'   => $end_label,
-                'when_label'  => self::whenLabel($begin, $end, $begin_label, $end_label),
-                'in_progress' => (bool) ($row['in_progress'] ?? false),
-                // "today" / "tomorrow" hint for tasks starting soon
-                'day'         => match (is_numeric($row['days_ahead'] ?? null) ? (int) $row['days_ahead'] : null) {
-                    0       => 'today',
-                    1       => 'tomorrow',
-                    default => null,
-                },
-            ];
-            $agenda[$users_id] = $entry;
+            ] + self::periodFields((string) $row['begin'], (string) $row['end'], $row);
         }
 
-        return $agenda;
+        return $entries;
+    }
+
+    /**
+     * Non-recurring external events the users own or are invited to, one
+     * entry per (event, user). Visibility follows the core rules.
+     *
+     * @param list<int> $users_ids
+     *
+     * @return list<array{users_id: int, type: 'event', id: int, tickets_id: int, ticket_name: string, category: string, color: string, url: string, begin: string, end: string, begin_label: string, end_label: string, when_label: string, in_progress: bool, day: ?string}>
+     */
+    private static function fetchEvents(array $users_ids): array
+    {
+        /** @var DBmysql $DB */
+        global $DB;
+
+        $evt_tbl = PlanningExternalEvent::getTable();
+        $cat_tbl = PlanningEventCategory::getTable();
+
+        $ownership = ['OR' => [$evt_tbl . '.users_id' => $users_ids]];
+        foreach ($users_ids as $users_id) {
+            $ownership['OR'][] = QueryFunction::jsonContains(
+                $evt_tbl . '.users_id_guests',
+                new QueryExpression((string) $users_id),
+                '$',
+            );
+        }
+
+        $where = [
+            $ownership,
+            ['NOT' => [$evt_tbl . '.begin' => null]],
+            $evt_tbl . '.end' => ['>=', QueryFunction::now()],
+            ['NOT' => [$evt_tbl . '.state' => Planning::DONE]],
+            // Recurring events are not expanded (out of scope)
+            ['OR' => [[$evt_tbl . '.rrule' => null], [$evt_tbl . '.rrule' => '']]],
+        ] + getEntitiesRestrictCriteria($evt_tbl, '', '', true);
+
+        $visibility = PlanningExternalEvent::getVisibilityCriteria();
+        if ($visibility !== []) {
+            $where[] = $visibility;
+        }
+
+        $iterator = $DB->request([
+            'SELECT'    => [
+                $evt_tbl . '.id',
+                $evt_tbl . '.users_id',
+                $evt_tbl . '.users_id_guests',
+                $evt_tbl . '.name',
+                $evt_tbl . '.begin',
+                $evt_tbl . '.end',
+                $cat_tbl . '.name AS category',
+                $cat_tbl . '.color AS color',
+                new QueryExpression($DB::quoteName($evt_tbl . '.begin') . ' <= NOW()', 'in_progress'),
+                new QueryExpression('DATEDIFF(' . $DB::quoteName($evt_tbl . '.begin') . ', CURDATE())', 'days_ahead'),
+            ],
+            'FROM'      => $evt_tbl,
+            'LEFT JOIN' => [
+                $cat_tbl => ['ON' => [$evt_tbl => 'planningeventcategories_id', $cat_tbl => 'id']],
+            ],
+            'WHERE'     => $where,
+        ]);
+
+        $entries = [];
+        foreach ($iterator as $row) {
+            if (
+                !is_array($row)
+                || !is_numeric($row['id'] ?? null)
+                || !is_scalar($row['begin'] ?? null)
+                || !is_scalar($row['end'] ?? null)
+            ) {
+                continue;
+            }
+
+            $guests = is_string($row['users_id_guests'] ?? null) ? importArrayFromDB($row['users_id_guests']) : [];
+            $guests = array_map(intval(...), array_filter($guests, is_numeric(...)));
+            $owner  = is_numeric($row['users_id'] ?? null) ? (int) $row['users_id'] : 0;
+
+            $id     = (int) $row['id'];
+            $common = [
+                'type'        => 'event',
+                'id'          => $id,
+                'tickets_id'  => 0,
+                'ticket_name' => is_scalar($row['name'] ?? null) ? (string) $row['name'] : '',
+                'category'    => is_scalar($row['category'] ?? null) ? (string) $row['category'] : '',
+                'color'       => is_scalar($row['color'] ?? null) ? (string) $row['color'] : '',
+                'url'         => PlanningExternalEvent::getFormURLWithID($id, true),
+            ] + self::periodFields((string) $row['begin'], (string) $row['end'], $row);
+
+            foreach ($users_ids as $users_id) {
+                if ($users_id === $owner || in_array($users_id, $guests, true)) {
+                    $entries[] = ['users_id' => $users_id] + $common;
+                }
+            }
+        }
+
+        return $entries;
+    }
+
+    /**
+     * Period fields shared by tasks and events, from a database row holding
+     * the `in_progress` and `days_ahead` expressions.
+     *
+     * @param array<array-key, mixed> $row
+     *
+     * @return array{begin: string, end: string, begin_label: string, end_label: string, when_label: string, in_progress: bool, day: ?string}
+     */
+    private static function periodFields(string $begin, string $end, array $row): array
+    {
+        $begin_label = (string) Html::convDateTime($begin);
+        $end_label   = (string) Html::convDateTime($end);
+
+        return [
+            'begin'       => $begin,
+            'end'         => $end,
+            'begin_label' => $begin_label,
+            'end_label'   => $end_label,
+            'when_label'  => self::whenLabel($begin, $end, $begin_label, $end_label),
+            'in_progress' => (bool) ($row['in_progress'] ?? false),
+            // "today" / "tomorrow" hint for entries starting soon
+            'day'         => match (is_numeric($row['days_ahead'] ?? null) ? (int) $row['days_ahead'] : null) {
+                0       => 'today',
+                1       => 'tomorrow',
+                default => null,
+            },
+        ];
     }
 
     /**
