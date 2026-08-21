@@ -190,7 +190,7 @@
 
     // Planned interventions section of a vehicle popup: upcoming ticket
     // tasks of the linked technician, or why there is nothing to show.
-    const plannedTasksHtml = (vehicle) => {
+    const plannedTasksHtml = (vehicle, warningColor) => {
         const title = `<span class="fleetview-tasks-title"><i class="ti ti-calendar-event"></i> ${__('Planned interventions', 'fleetview')}</span>`;
 
         if (!vehicle.technician_linked) {
@@ -204,7 +204,7 @@
 
         const items = tasks.map((task) => {
             const when = task.in_progress
-                ? `${_.escape(task.end_label)} <span class="badge bg-orange-lt">${__('in progress', 'fleetview')}</span>`
+                ? `${_.escape(task.end_label)} <span class="badge" style="background:${_.escape(warningColor)}">${__('in progress', 'fleetview')}</span>`
                 : _.escape(task.begin_label);
             const label = `#${task.tickets_id} ${_.escape(task.ticket_name)}`;
             return `<li><span class="fleetview-task-date">${when}</span>`
@@ -409,7 +409,7 @@
                     `<i class="ti ti-route"></i> ${__('%1 km as the crow flies', 'fleetview', vehicle.distance_km)}`,
                     travel ? `<i class="ti ti-car"></i> ${travel}` : null,
                     `<i class="ti ti-clock"></i> ${_.escape(formatDate(vehicle.updated_at))}`,
-                    data.max_tasks > 0 ? plannedTasksHtml(vehicle) : null,
+                    data.max_tasks > 0 ? plannedTasksHtml(vehicle, data.warning_color) : null,
                     assign,
                 ].filter(Boolean).join('<br>');
 

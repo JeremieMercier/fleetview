@@ -469,6 +469,7 @@ final class MapControllerTest extends DbTestCase
 
         $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
         $this->assertSame(2, $payload['max_tasks']);
+        $this->assertMatchesRegularExpression('/^#[0-9a-fA-F]{6}$/', $payload['warning_color']);
 
         [$linked, $unlinked] = $payload['vehicles'];
         $this->assertSame('202', $linked['id']);

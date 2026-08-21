@@ -194,6 +194,9 @@ final class MapController extends AbstractController
             'can_assign'    => $can_assign,
             'radius_km'     => (float) $config['search_radius'],
             'max_tasks'     => $max_tasks,
+            // User's "due date" warning color, reused for the in-progress
+            // badge (the technician is already busy)
+            'warning_color' => is_string($_SESSION['glpiduedatewarning_color'] ?? null) ? $_SESSION['glpiduedatewarning_color'] : '#f39f5a',
             'marker_colors' => [
                 'top1' => $config['marker_color_top1'],
                 'top2' => $config['marker_color_top2'],
