@@ -105,3 +105,8 @@
     font-size: 0.9em;
     color: var(--tblr-secondary, #667382);
 }
+
+.fleetview-task-badge {
+    margin-left: 0.5rem;
+    vertical-align: baseline;
+}
