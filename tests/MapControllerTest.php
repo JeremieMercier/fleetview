@@ -33,6 +33,7 @@
 
 namespace GlpiPlugin\Fleetview\Tests;
 
+use Html;
 use CommonITILActor;
 use Config;
 use Entity;
@@ -554,9 +555,9 @@ final class MapControllerTest extends DbTestCase
         $labels  = array_column($payload['vehicles'][0]['planned_tasks'], 'when_label', 'id');
 
         $this->assertSame([null, null, null], array_column($payload['vehicles'][0]['planned_tasks'], 'day'));
-        $this->assertSame(\Html::convDate('2030-03-10'), $labels[$one_day]);
-        $this->assertSame(\Html::convDate('2030-04-01') . ' – ' . \Html::convDate('2030-04-03'), $labels[$several]);
-        $this->assertSame(\Html::convDate('2030-05-01') . ' – ' . \Html::convDate('2030-05-02'), $labels[$midnight]);
+        $this->assertSame(Html::convDate('2030-03-10'), $labels[$one_day]);
+        $this->assertSame(Html::convDate('2030-04-01') . ' – ' . Html::convDate('2030-04-03'), $labels[$several]);
+        $this->assertSame(Html::convDate('2030-05-01') . ' – ' . Html::convDate('2030-05-02'), $labels[$midnight]);
     }
 
     public function testTicketVehiclesFlagsTasksOfTodayAndTomorrow(): void
@@ -580,7 +581,7 @@ final class MapControllerTest extends DbTestCase
             'users_id_tech' => $tech_id,
             'state'         => Planning::TODO,
         ];
-        $day = static fn(int $offset, string $time): string => date('Y-m-d', strtotime("$today +$offset day")) . ' ' . $time;
+        $day = static fn(int $offset, string $time): string => date('Y-m-d', strtotime(sprintf('%s +%d day', $today, $offset))) . ' ' . $time;
         $tonight   = $task->add($base + ['begin' => $day(0, '23:58:00'), 'end' => $day(0, '23:59:00')]);
         $tomorrow  = $task->add($base + ['begin' => $day(1, '09:00:00'), 'end' => $day(1, '10:00:00')]);
         $later     = $task->add($base + ['begin' => $day(2, '09:00:00'), 'end' => $day(2, '10:00:00')]);
