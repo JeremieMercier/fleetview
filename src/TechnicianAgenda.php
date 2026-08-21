@@ -34,6 +34,8 @@
 namespace GlpiPlugin\Fleetview;
 
 use DBmysql;
+use Glpi\DBAL\QueryExpression;
+use Glpi\DBAL\QueryFunction;
 use Html;
 use Planning;
 use Session;
@@ -76,7 +78,6 @@ final class TechnicianAgenda
             return [];
         }
 
-        $now      = Session::getCurrentTime() ?? date('Y-m-d H:i:s');
         $me       = Session::getLoginUserID();
         $task_tbl = TicketTask::getTable();
         $tkt_tbl  = Ticket::getTable();
@@ -85,7 +86,7 @@ final class TechnicianAgenda
             $task_tbl . '.users_id_tech' => $users_ids,
             $task_tbl . '.state'         => Planning::TODO,
             ['NOT' => [$task_tbl . '.begin' => null]],
-            $task_tbl . '.end'           => ['>=', $now],
+            $task_tbl . '.end'           => ['>=', QueryFunction::now()],
             $tkt_tbl . '.is_deleted'     => 0,
             ['NOT' => [$tkt_tbl . '.status' => array_merge(Ticket::getSolvedStatusArray(), Ticket::getClosedStatusArray())]],
         ] + getEntitiesRestrictCriteria($tkt_tbl);
@@ -108,6 +109,9 @@ final class TechnicianAgenda
                 $task_tbl . '.end',
                 $tkt_tbl . '.id AS tickets_id',
                 $tkt_tbl . '.name AS ticket_name',
+                // Compared by the database: stored dates and NOW() share the
+                // same clock, unlike PHP whose timezone may differ
+                new QueryExpression($DB::quoteName($task_tbl . '.begin') . ' <= NOW()', 'in_progress'),
             ],
             'FROM'       => $task_tbl,
             'INNER JOIN' => [
@@ -153,7 +157,7 @@ final class TechnicianAgenda
                 'end'         => $end,
                 'begin_label' => (string) Html::convDateTime($begin),
                 'end_label'   => (string) Html::convDateTime($end),
-                'in_progress' => $begin <= $now,
+                'in_progress' => (bool) ($row['in_progress'] ?? false),
             ];
             $agenda[$users_id] = $entry;
         }

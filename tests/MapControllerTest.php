@@ -107,13 +107,20 @@ final class MapControllerTest extends DbTestCase
      */
     private function createPlannedTask(Ticket $ticket, int $users_id_tech, int $begin_hours, int $end_hours, array $extra = []): int
     {
+        global $DB;
+
+        // Offsets from the database clock: "in progress" and "over" are
+        // decided by MySQL, whose timezone may differ from PHP's
+        $now = $DB->doQuery('SELECT NOW() AS now')->fetch_assoc()['now'] ?? null;
+        $this->assertIsString($now);
+
         $task = new TicketTask();
         $id   = $task->add($extra + [
             'tickets_id'    => $ticket->getID(),
             'content'       => 'Intervention fictive',
             'users_id_tech' => $users_id_tech,
-            'begin'         => date('Y-m-d H:i:s', strtotime(sprintf('%+d hours', $begin_hours))),
-            'end'           => date('Y-m-d H:i:s', strtotime(sprintf('%+d hours', $end_hours))),
+            'begin'         => date('Y-m-d H:i:s', strtotime(sprintf('%s %+d hours', $now, $begin_hours))),
+            'end'           => date('Y-m-d H:i:s', strtotime(sprintf('%s %+d hours', $now, $end_hours))),
             'state'         => Planning::TODO,
         ]);
         $this->assertGreaterThan(0, $id);
