@@ -70,3 +70,38 @@
     border-radius: 50%;
     vertical-align: middle;
 }
+
+/* Planned interventions list in the vehicle popup */
+.fleetview-tasks-title {
+    display: inline-block;
+    margin-top: 0.35rem;
+    font-weight: 600;
+}
+
+.fleetview-tasks {
+    margin: 0.15rem 0 0;
+    padding-left: 0;
+    list-style: none;
+    max-height: 12rem;
+    overflow-y: auto;
+    font-size: 0.9em;
+}
+
+.fleetview-tasks li {
+    padding: 0.15rem 0;
+    border-top: 1px solid var(--tblr-border-color, #e6e7e9);
+}
+
+.fleetview-tasks a {
+    display: block;
+    max-width: 320px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fleetview-task-date {
+    display: block;
+    font-size: 0.9em;
+    color: var(--tblr-secondary, #667382);
+}

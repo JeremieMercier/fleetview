@@ -58,6 +58,7 @@ final class PluginConfigTest extends TestCase
         // Name matching is opt-in: it only fits fleets naming vehicles
         // after their technician
         $this->assertSame('0', $defaults['name_matching_fallback']);
+        $this->assertSame('6', $defaults['popup_max_tasks']);
 
         // Map filters are disabled by default
         $this->assertSame('', $defaults['modal_group']);

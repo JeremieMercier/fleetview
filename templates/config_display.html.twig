@@ -57,6 +57,17 @@
                 {'min': 1, 'max': 100}
             ) }}
 
+            {{ fields.numberField(
+                'popup_max_tasks',
+                config['popup_max_tasks'],
+                __('Planned interventions listed in the marker popup', 'fleetview'),
+                {
+                    'min': 0,
+                    'max': 20,
+                    'helper': __('Upcoming ticket tasks of the linked technician. 0 hides the section.', 'fleetview')
+                }
+            ) }}
+
             {{ fields.colorField(
                 'marker_color_ticket',
                 config['marker_color_ticket'],

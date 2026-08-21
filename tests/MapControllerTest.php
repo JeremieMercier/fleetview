@@ -47,9 +47,11 @@ use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Response;
 use Location;
+use Planning;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Ticket;
+use TicketTask;
 use Ticket_User;
 use User;
 
@@ -97,6 +99,26 @@ final class MapControllerTest extends DbTestCase
         $this->assertGreaterThan(0, $id);
 
         return $ticket;
+    }
+
+    /**
+     * Planned task of a technician on a ticket, offset in hours from now
+     * (negative = already started / over).
+     */
+    private function createPlannedTask(Ticket $ticket, int $users_id_tech, int $begin_hours, int $end_hours, array $extra = []): int
+    {
+        $task = new TicketTask();
+        $id   = $task->add($extra + [
+            'tickets_id'    => $ticket->getID(),
+            'content'       => 'Intervention fictive',
+            'users_id_tech' => $users_id_tech,
+            'begin'         => date('Y-m-d H:i:s', strtotime(sprintf('%+d hours', $begin_hours))),
+            'end'           => date('Y-m-d H:i:s', strtotime(sprintf('%+d hours', $end_hours))),
+            'state'         => Planning::TODO,
+        ]);
+        $this->assertGreaterThan(0, $id);
+
+        return $id;
     }
 
     /**
@@ -414,5 +436,83 @@ final class MapControllerTest extends DbTestCase
 
         $this->assertFalse($payload['can_assign']);
         $this->assertSame([null, null], array_column($payload['vehicles'], 'user_id'));
+        // The link itself is still reported: it drives the planned interventions
+        $this->assertSame([true, false], array_column($payload['vehicles'], 'technician_linked'));
+    }
+
+    public function testTicketVehiclesListsPlannedTasksOfLinkedTechnicians(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi(['popup_max_tasks' => '2']);
+        $ticket  = $this->createTicket($this->createGeoLocation()->getID());
+        $tech_id = getItemByTypeName(User::class, 'tech', true);
+        VehicleMapping::save('202', 'Martin Sophie', $tech_id);
+
+        $job    = $this->createTicket();
+        $other  = $this->createTicket();
+        $closed = $this->createTicket();
+
+        $in_progress = $this->createPlannedTask($job, $tech_id, -1, 1);
+        $tomorrow    = $this->createPlannedTask($other, $tech_id, 24, 26);
+        $this->createPlannedTask($job, $tech_id, 48, 50);            // beyond the limit
+        $this->createPlannedTask($job, $tech_id, -48, -46);          // over
+        $this->createPlannedTask($job, $tech_id, 72, 74, ['state' => Planning::DONE]);
+        $this->createPlannedTask($closed, $tech_id, 96, 98);
+        $this->assertTrue($closed->update(['id' => $closed->getID(), 'status' => Ticket::CLOSED]));
+
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $this->assertSame(2, $payload['max_tasks']);
+
+        [$linked, $unlinked] = $payload['vehicles'];
+        $this->assertSame('202', $linked['id']);
+        $this->assertTrue($linked['technician_linked']);
+        $this->assertSame([$in_progress, $tomorrow], array_column($linked['planned_tasks'], 'id'));
+        $this->assertSame(1, $linked['planned_tasks_more']);
+
+        $first = $linked['planned_tasks'][0];
+        $this->assertTrue($first['in_progress']);
+        $this->assertSame($job->getID(), $first['tickets_id']);
+        $this->assertSame('Ticket test fictif', $first['ticket_name']);
+        $this->assertStringContainsString('ticket.form.php?id=' . $job->getID(), $first['url']);
+        $this->assertNotSame('', $first['begin_label']);
+        $this->assertFalse($linked['planned_tasks'][1]['in_progress']);
+
+        $this->assertFalse($unlinked['technician_linked']);
+        $this->assertSame([], $unlinked['planned_tasks']);
+        $this->assertSame(0, $unlinked['planned_tasks_more']);
+    }
+
+    public function testTicketVehiclesHidesPrivateTasksFromOtherUsers(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi();
+        $requester_id = getItemByTypeName(User::class, 'post-only', true);
+        $ticket  = $this->createTicket($this->createGeoLocation()->getID(), $requester_id);
+        $tech_id = getItemByTypeName(User::class, 'tech', true);
+        VehicleMapping::save('202', 'Martin Sophie', $tech_id);
+
+        $job    = $this->createTicket();
+        $public = $this->createPlannedTask($job, $tech_id, 24, 26);
+        $this->createPlannedTask($job, $tech_id, 48, 50, ['is_private' => 1]);
+
+        $this->login('post-only');
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+
+        $this->assertSame([$public], array_column($payload['vehicles'][0]['planned_tasks'], 'id'));
+    }
+
+    public function testTicketVehiclesSkipsPlannedTasksWhenDisabled(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi(['popup_max_tasks' => '0']);
+        $ticket  = $this->createTicket($this->createGeoLocation()->getID());
+        $tech_id = getItemByTypeName(User::class, 'tech', true);
+        VehicleMapping::save('202', 'Martin Sophie', $tech_id);
+        $this->createPlannedTask($this->createTicket(), $tech_id, 24, 26);
+
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+
+        $this->assertSame(0, $payload['max_tasks']);
+        $this->assertSame([null, null], array_column($payload['vehicles'], 'planned_tasks'));
     }
 }

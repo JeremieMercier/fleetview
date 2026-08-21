@@ -40,6 +40,7 @@ use GlpiPlugin\Fleetview\Masternaut\MasternautApiException;
 use GlpiPlugin\Fleetview\Masternaut\MasternautClient;
 use GlpiPlugin\Fleetview\PluginConfig;
 use GlpiPlugin\Fleetview\Routing\OsrmRouter;
+use GlpiPlugin\Fleetview\TechnicianAgenda;
 use GlpiPlugin\Fleetview\TechnicianMatcher;
 use GlpiPlugin\Fleetview\VehicleMapping;
 use Location;
@@ -156,20 +157,34 @@ final class MapController extends AbstractController
         usort($vehicles, static fn(array $a, array $b) => ($a['travel_time_min'] ?? PHP_INT_MAX) <=> ($b['travel_time_min'] ?? PHP_INT_MAX)
             ?: $a['distance_km'] <=> $b['distance_km']);
 
-        // Link vehicles to GLPI users so they can be assigned from the modal:
-        // explicit associations first, optional name matching as fallback.
+        // Link vehicles to GLPI users: explicit associations first, optional
+        // name matching as fallback. The link drives the planned interventions
+        // of the popup; the assignment button additionally needs the right.
         $can_assign = (bool) $ticket->canAssign();
-        $mappings   = $can_assign ? VehicleMapping::getMap() : [];
+        $mappings   = VehicleMapping::getMap();
         $matcher    = $config['name_matching_fallback'] ? new TechnicianMatcher() : null;
-        foreach ($vehicles as &$vehicle) {
-            $user_id = null;
-            if ($can_assign) {
-                $user_id = $mappings[$vehicle['id']]
-                    ?? $matcher?->match($vehicle['label'])
-                    ?? $matcher?->match($vehicle['driver_name']);
-            }
+        $linked     = [];
+        foreach ($vehicles as $i => &$vehicle) {
+            $user_id = $mappings[$vehicle['id']]
+                ?? $matcher?->match($vehicle['label'])
+                ?? $matcher?->match($vehicle['driver_name']);
 
-            $vehicle['user_id'] = $user_id;
+            $linked[$i]                   = $user_id;
+            $vehicle['user_id']           = $can_assign ? $user_id : null;
+            $vehicle['technician_linked'] = $user_id !== null;
+        }
+
+        unset($vehicle);
+
+        // Planned interventions of the linked technicians (0 = disabled)
+        $max_tasks = max(0, (int) $config['popup_max_tasks']);
+        $agenda    = $max_tasks > 0
+            ? TechnicianAgenda::getPlannedTasks(array_values(array_filter($linked)), $max_tasks)
+            : [];
+        foreach ($vehicles as $i => &$vehicle) {
+            $entry = $linked[$i] !== null ? ($agenda[$linked[$i]] ?? null) : null;
+            $vehicle['planned_tasks']      = $max_tasks > 0 ? ($entry['tasks'] ?? []) : null;
+            $vehicle['planned_tasks_more'] = $entry['more'] ?? 0;
         }
 
         unset($vehicle);
@@ -178,6 +193,7 @@ final class MapController extends AbstractController
             'configured'    => true,
             'can_assign'    => $can_assign,
             'radius_km'     => (float) $config['search_radius'],
+            'max_tasks'     => $max_tasks,
             'marker_colors' => [
                 'top1' => $config['marker_color_top1'],
                 'top2' => $config['marker_color_top2'],
