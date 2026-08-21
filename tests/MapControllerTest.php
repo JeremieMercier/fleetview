@@ -479,6 +479,7 @@ final class MapControllerTest extends DbTestCase
 
         $first = $linked['planned_tasks'][0];
         $this->assertTrue($first['in_progress']);
+        $this->assertContains($first['day'], ['today', null]); // started an hour ago: today, or yesterday around midnight
         $this->assertSame($job->getID(), $first['tickets_id']);
         $this->assertSame('Ticket test fictif', $first['ticket_name']);
         $this->assertStringContainsString('ticket.form.php?id=' . $job->getID(), $first['url']);
@@ -552,9 +553,45 @@ final class MapControllerTest extends DbTestCase
         $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
         $labels  = array_column($payload['vehicles'][0]['planned_tasks'], 'when_label', 'id');
 
+        $this->assertSame([null, null, null], array_column($payload['vehicles'][0]['planned_tasks'], 'day'));
         $this->assertSame(\Html::convDate('2030-03-10'), $labels[$one_day]);
         $this->assertSame(\Html::convDate('2030-04-01') . ' – ' . \Html::convDate('2030-04-03'), $labels[$several]);
         $this->assertSame(\Html::convDate('2030-05-01') . ' – ' . \Html::convDate('2030-05-02'), $labels[$midnight]);
+    }
+
+    public function testTicketVehiclesFlagsTasksOfTodayAndTomorrow(): void
+    {
+        global $DB;
+
+        $this->login('glpi');
+        $this->configurePluginApi();
+        $ticket  = $this->createTicket($this->createGeoLocation()->getID());
+        $tech_id = getItemByTypeName(User::class, 'tech', true);
+        VehicleMapping::save('202', 'Martin Sophie', $tech_id);
+
+        $today = $DB->doQuery('SELECT CURDATE() AS today')->fetch_assoc()['today'] ?? null;
+        $this->assertIsString($today);
+
+        $job  = $this->createTicket();
+        $task = new TicketTask();
+        $base = [
+            'tickets_id'    => $job->getID(),
+            'content'       => 'Intervention fictive',
+            'users_id_tech' => $tech_id,
+            'state'         => Planning::TODO,
+        ];
+        $day = static fn(int $offset, string $time): string => date('Y-m-d', strtotime("$today +$offset day")) . ' ' . $time;
+        $tonight   = $task->add($base + ['begin' => $day(0, '23:58:00'), 'end' => $day(0, '23:59:00')]);
+        $tomorrow  = $task->add($base + ['begin' => $day(1, '09:00:00'), 'end' => $day(1, '10:00:00')]);
+        $later     = $task->add($base + ['begin' => $day(2, '09:00:00'), 'end' => $day(2, '10:00:00')]);
+        $this->assertGreaterThan(0, min($tonight, $tomorrow, $later));
+
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $days    = array_column($payload['vehicles'][0]['planned_tasks'], 'day', 'id');
+
+        $this->assertSame('today', $days[$tonight]);
+        $this->assertSame('tomorrow', $days[$tomorrow]);
+        $this->assertNull($days[$later]);
     }
 
     public function testTicketVehiclesSkipsPlannedTasksWhenDisabled(): void

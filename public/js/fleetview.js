@@ -203,9 +203,16 @@
         }
 
         const items = tasks.map((task) => {
-            const badge = task.in_progress
-                ? ` <span class="badge fleetview-task-badge" style="background:${_.escape(warningColor)}">${__('in progress', 'fleetview')}</span>`
-                : '';
+            // One hint per task: in progress (warning color), then today
+            // (same warning), then tomorrow (neutral)
+            let badge = '';
+            if (task.in_progress) {
+                badge = ` <span class="badge fleetview-task-badge" style="background:${_.escape(warningColor)}">${__('in progress', 'fleetview')}</span>`;
+            } else if (task.day === 'today') {
+                badge = ` <span class="badge fleetview-task-badge" style="background:${_.escape(warningColor)}">${__('today', 'fleetview')}</span>`;
+            } else if (task.day === 'tomorrow') {
+                badge = ` <span class="badge fleetview-task-badge bg-secondary-lt">${__('tomorrow', 'fleetview')}</span>`;
+            }
             const when = _.escape(task.when_label) + badge;
             const label = `#${task.tickets_id} ${_.escape(task.ticket_name)}`;
             return `<li><span class="fleetview-task-date">${when}</span>`

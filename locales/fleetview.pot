@@ -323,3 +323,11 @@ msgid "+ %1 other"
 msgid_plural "+ %1 others"
 msgstr[0] ""
 msgstr[1] ""
+
+#: public/js/fleetview.js
+msgid "today"
+msgstr ""
+
+#: public/js/fleetview.js
+msgid "tomorrow"
+msgstr ""

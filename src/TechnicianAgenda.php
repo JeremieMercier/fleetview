@@ -114,6 +114,7 @@ final class TechnicianAgenda
                 // Compared by the database: stored dates and NOW() share the
                 // same clock, unlike PHP whose timezone may differ
                 new QueryExpression($DB::quoteName($task_tbl . '.begin') . ' <= NOW()', 'in_progress'),
+                new QueryExpression('DATEDIFF(' . $DB::quoteName($task_tbl . '.begin') . ', CURDATE())', 'days_ahead'),
             ],
             'FROM'       => $task_tbl,
             'INNER JOIN' => [
@@ -123,7 +124,7 @@ final class TechnicianAgenda
             'ORDER'      => [$task_tbl . '.begin ASC', $task_tbl . '.id ASC'],
         ]);
 
-        /** @var array<int, array{tasks: list<array{id: int, tickets_id: int, ticket_name: string, url: string, begin: string, end: string, begin_label: string, end_label: string, when_label: string, in_progress: bool}>, more: int}> $agenda */
+        /** @var array<int, array{tasks: list<array{id: int, tickets_id: int, ticket_name: string, url: string, begin: string, end: string, begin_label: string, end_label: string, when_label: string, in_progress: bool, day: ?string}>, more: int}> $agenda */
         $agenda = [];
         foreach ($iterator as $row) {
             if (
@@ -163,6 +164,12 @@ final class TechnicianAgenda
                 'end_label'   => $end_label,
                 'when_label'  => self::whenLabel($begin, $end, $begin_label, $end_label),
                 'in_progress' => (bool) ($row['in_progress'] ?? false),
+                // "today" / "tomorrow" hint for tasks starting soon
+                'day'         => match (is_numeric($row['days_ahead'] ?? null) ? (int) $row['days_ahead'] : null) {
+                    0       => 'today',
+                    1       => 'tomorrow',
+                    default => null,
+                },
             ];
             $agenda[$users_id] = $entry;
         }

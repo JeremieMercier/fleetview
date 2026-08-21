@@ -349,3 +349,11 @@ msgid "+ %1 other"
 msgid_plural "+ %1 others"
 msgstr[0] "+ %1 other"
 msgstr[1] "+ %1 others"
+
+#: public/js/fleetview.js
+msgid "today"
+msgstr "today"
+
+#: public/js/fleetview.js
+msgid "tomorrow"
+msgstr "tomorrow"
