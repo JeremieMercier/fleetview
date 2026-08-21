@@ -108,6 +108,9 @@ final class PluginConfig extends CommonGLPI
             // Planned interventions (ticket tasks) listed in the vehicle
             // marker popup; 0 = section hidden
             'popup_max_tasks' => '6',
+            // Also list the external events (leaves, reservations...) of
+            // the linked technician, merged chronologically with the tasks
+            'popup_external_events' => '1',
         ];
     }
 

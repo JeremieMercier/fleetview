@@ -49,6 +49,8 @@ use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Response;
 use Location;
 use Planning;
+use PlanningEventCategory;
+use PlanningExternalEvent;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Ticket;
@@ -593,6 +595,102 @@ final class MapControllerTest extends DbTestCase
         $this->assertSame('today', $days[$tonight]);
         $this->assertSame('tomorrow', $days[$tomorrow]);
         $this->assertNull($days[$later]);
+    }
+
+    /**
+     * External event offset in hours from the database clock.
+     */
+    private function createExternalEvent(int $users_id, int $begin_hours, int $end_hours, array $extra = []): int
+    {
+        global $DB;
+
+        $now = $DB->doQuery('SELECT NOW() AS now')->fetch_assoc()['now'] ?? null;
+        $this->assertIsString($now);
+
+        $event = new PlanningExternalEvent();
+        $id    = $event->add($extra + [
+            'name'        => 'Congés fictifs',
+            'entities_id' => $this->rootEntityId(),
+            'users_id'    => $users_id,
+            'plan'        => [
+                'begin' => date('Y-m-d H:i:s', strtotime(sprintf('%s %+d hours', $now, $begin_hours))),
+                'end'   => date('Y-m-d H:i:s', strtotime(sprintf('%s %+d hours', $now, $end_hours))),
+            ],
+            'state'       => Planning::INFO,
+        ]);
+        $this->assertGreaterThan(0, $id);
+
+        return $id;
+    }
+
+    public function testTicketVehiclesMergesExternalEventsWithTasks(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi();
+        $ticket   = $this->createTicket($this->createGeoLocation()->getID());
+        $tech_id  = getItemByTypeName(User::class, 'tech', true);
+        $other_id = getItemByTypeName(User::class, 'normal', true);
+        VehicleMapping::save('202', 'Martin Sophie', $tech_id);
+
+        $category = new PlanningEventCategory();
+        $cat_id   = $category->add(['name' => 'RTT', 'color' => '#1e90ff']);
+        $this->assertGreaterThan(0, $cat_id);
+
+        $task  = $this->createPlannedTask($this->createTicket(), $tech_id, 30, 32);
+        $owned = $this->createExternalEvent($tech_id, 10, 12, ['planningeventcategories_id' => $cat_id]);
+        $guest = $this->createExternalEvent($other_id, 50, 52, ['users_id_guests' => [$tech_id], 'name' => 'Réunion fictive']);
+        $this->createExternalEvent($other_id, 60, 62);                                   // someone else's
+        $this->createExternalEvent($tech_id, -10, -8);                                   // over
+        $this->createExternalEvent($tech_id, 70, 72, ['state' => Planning::DONE]);
+        $this->createExternalEvent($tech_id, 80, 82, ['rrule' => ['freq' => 'weekly', 'interval' => 1]]); // recurring: ignored
+
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $this->assertTrue($payload['with_events']);
+
+        $entries = $payload['vehicles'][0]['planned_tasks'];
+        $this->assertSame(
+            [['event', $owned], ['task', $task], ['event', $guest]],
+            array_map(static fn(array $e) => [$e['type'], $e['id']], $entries),
+        );
+
+        $this->assertSame('RTT', $entries[0]['category']);
+        $this->assertSame('#1e90ff', $entries[0]['color']);
+        $this->assertSame('Congés fictifs', $entries[0]['ticket_name']);
+        $this->assertStringContainsString('planningexternalevent.form.php?id=' . $owned, $entries[0]['url']);
+        $this->assertSame('', $entries[1]['category']);
+        $this->assertSame('Réunion fictive', $entries[2]['ticket_name']);
+    }
+
+    public function testTicketVehiclesHidesExternalEventsWithoutPlanningRights(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi();
+        $requester_id = getItemByTypeName(User::class, 'post-only', true);
+        $ticket  = $this->createTicket($this->createGeoLocation()->getID(), $requester_id);
+        $tech_id = getItemByTypeName(User::class, 'tech', true);
+        VehicleMapping::save('202', 'Martin Sophie', $tech_id);
+        $this->createExternalEvent($tech_id, 10, 12);
+
+        $this->login('post-only');
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+
+        $this->assertSame([], $payload['vehicles'][0]['planned_tasks']);
+    }
+
+    public function testTicketVehiclesSkipsExternalEventsWhenDisabled(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi(['popup_external_events' => '0']);
+        $ticket  = $this->createTicket($this->createGeoLocation()->getID());
+        $tech_id = getItemByTypeName(User::class, 'tech', true);
+        VehicleMapping::save('202', 'Martin Sophie', $tech_id);
+        $this->createExternalEvent($tech_id, 10, 12);
+        $task = $this->createPlannedTask($this->createTicket(), $tech_id, 30, 32);
+
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+
+        $this->assertFalse($payload['with_events']);
+        $this->assertSame([$task], array_column($payload['vehicles'][0]['planned_tasks'], 'id'));
     }
 
     public function testTicketVehiclesSkipsPlannedTasksWhenDisabled(): void

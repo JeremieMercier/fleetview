@@ -68,6 +68,15 @@
                 }
             ) }}
 
+            {{ fields.sliderField(
+                'popup_external_events',
+                config['popup_external_events'],
+                __('Also list external events (leaves, reservations...)', 'fleetview'),
+                {
+                    'helper': __('Events the technician owns or is invited to, merged with the tasks. GLPI planning rights apply.', 'fleetview'),
+                }
+            ) }}
+
             {{ fields.colorField(
                 'marker_color_ticket',
                 config['marker_color_ticket'],

@@ -177,9 +177,10 @@ final class MapController extends AbstractController
         unset($vehicle);
 
         // Planned interventions of the linked technicians (0 = disabled)
-        $max_tasks = max(0, (int) $config['popup_max_tasks']);
-        $agenda    = $max_tasks > 0
-            ? TechnicianAgenda::getPlannedTasks(array_values(array_filter($linked)), $max_tasks)
+        $max_tasks   = max(0, (int) $config['popup_max_tasks']);
+        $with_events = (bool) $config['popup_external_events'];
+        $agenda      = $max_tasks > 0
+            ? TechnicianAgenda::getPlannedTasks(array_values(array_filter($linked)), $max_tasks, $with_events)
             : [];
         foreach ($vehicles as $i => &$vehicle) {
             $entry = $linked[$i] !== null ? ($agenda[$linked[$i]] ?? null) : null;
@@ -194,6 +195,7 @@ final class MapController extends AbstractController
             'can_assign'    => $can_assign,
             'radius_km'     => (float) $config['search_radius'],
             'max_tasks'     => $max_tasks,
+            'with_events'   => $with_events,
             // User's "due date" warning color, reused for the in-progress
             // badge (the technician is already busy)
             'warning_color' => is_string($_SESSION['glpiduedatewarning_color'] ?? null) ? $_SESSION['glpiduedatewarning_color'] : '#f39f5a',
