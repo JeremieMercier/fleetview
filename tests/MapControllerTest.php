@@ -528,6 +528,35 @@ final class MapControllerTest extends DbTestCase
         $this->assertSame($task['begin_label'] . ' – ' . $task['end_label'], $task['when_label']);
     }
 
+    public function testTicketVehiclesLabelsFullDayTasksWithDatesOnly(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi();
+        $ticket  = $this->createTicket($this->createGeoLocation()->getID());
+        $tech_id = getItemByTypeName(User::class, 'tech', true);
+        VehicleMapping::save('202', 'Martin Sophie', $tech_id);
+
+        $job  = $this->createTicket();
+        $task = new TicketTask();
+        $base = [
+            'tickets_id'    => $job->getID(),
+            'content'       => 'Journée entière fictive',
+            'users_id_tech' => $tech_id,
+            'state'         => Planning::TODO,
+        ];
+        $one_day   = $task->add($base + ['begin' => '2030-03-10 00:00:00', 'end' => '2030-03-10 23:59:59']);
+        $several   = $task->add($base + ['begin' => '2030-04-01 00:00:00', 'end' => '2030-04-03 23:59:59']);
+        $midnight  = $task->add($base + ['begin' => '2030-05-01 00:00:00', 'end' => '2030-05-03 00:00:00']);
+        $this->assertGreaterThan(0, min($one_day, $several, $midnight));
+
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $labels  = array_column($payload['vehicles'][0]['planned_tasks'], 'when_label', 'id');
+
+        $this->assertSame(\Html::convDate('2030-03-10'), $labels[$one_day]);
+        $this->assertSame(\Html::convDate('2030-04-01') . ' – ' . \Html::convDate('2030-04-03'), $labels[$several]);
+        $this->assertSame(\Html::convDate('2030-05-01') . ' – ' . \Html::convDate('2030-05-02'), $labels[$midnight]);
+    }
+
     public function testTicketVehiclesSkipsPlannedTasksWhenDisabled(): void
     {
         $this->login('glpi');

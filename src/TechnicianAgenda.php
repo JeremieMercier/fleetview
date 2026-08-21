@@ -42,6 +42,8 @@ use Session;
 use Ticket;
 use TicketTask;
 
+use function Safe\strtotime;
+
 /**
  * Planned interventions (ticket tasks) of technicians, displayed in the
  * vehicle marker popup of the map. Only "to do" tasks with a planning that
@@ -159,15 +161,47 @@ final class TechnicianAgenda
                 'end'         => $end,
                 'begin_label' => $begin_label,
                 'end_label'   => $end_label,
-                // "date begin – end" on a single day, full dates otherwise
-                'when_label'  => substr($begin, 0, 10) === substr($end, 0, 10)
-                    ? $begin_label . ' – ' . substr($end_label, -5)
-                    : $begin_label . ' – ' . $end_label,
+                'when_label'  => self::whenLabel($begin, $end, $begin_label, $end_label),
                 'in_progress' => (bool) ($row['in_progress'] ?? false),
             ];
             $agenda[$users_id] = $entry;
         }
 
         return $agenda;
+    }
+
+    /**
+     * Human-readable period of a task, on one line:
+     *  - full days (00:00 to 23:59 or midnight): dates only, "d1" or "d1 – d2"
+     *  - same day: "date begin – end time"
+     *  - otherwise: both full date-times
+     */
+    private static function whenLabel(string $begin, string $end, string $begin_label, string $end_label): string
+    {
+        $begin_day = substr($begin, 0, 10);
+        $end_day   = substr($end, 0, 10);
+        $same_day  = $begin_day === $end_day;
+
+        $full_days = substr($begin, 11, 8) === '00:00:00'
+            && (
+                in_array(substr($end, 11, 8), ['23:59:59', '23:59:00'], true)
+                || (substr($end, 11, 8) === '00:00:00' && !$same_day)
+            );
+
+        if ($full_days) {
+            // An end at midnight belongs to the previous day
+            if (substr($end, 11, 8) === '00:00:00') {
+                $end_day = date('Y-m-d', strtotime($end_day . ' -1 day'));
+            }
+
+            $begin_date = (string) Html::convDate($begin_day);
+            $end_date   = (string) Html::convDate($end_day);
+
+            return $begin_day === $end_day ? $begin_date : $begin_date . ' – ' . $end_date;
+        }
+
+        return $same_day
+            ? $begin_label . ' – ' . substr($end_label, -5)
+            : $begin_label . ' – ' . $end_label;
     }
 }
