@@ -337,8 +337,8 @@ msgid "tomorrow"
 msgstr "demain"
 
 #: templates/config_display.html.twig
-msgid "Also list external events (leaves, reservations...)"
-msgstr "Lister aussi les événements externes (congés, réservations...)"
+msgid "List external events"
+msgstr "Lister les événements externes"
 
 #: templates/config_display.html.twig
 msgid "Events the technician owns or is invited to, merged with the tasks. GLPI planning rights apply."

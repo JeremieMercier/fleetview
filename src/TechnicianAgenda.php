@@ -50,8 +50,8 @@ use function Safe\strtotime;
  * Upcoming schedule of technicians, displayed in the vehicle marker popup
  * of the map: planned ticket tasks ("to do", not over yet, on open tickets
  * visible from the current entities) merged chronologically with their
- * external events (leaves, reservations... owned or as a guest, visible
- * according to the core planning rights).
+ * external events (owned or as a guest, visible according to the core
+ * planning rights).
  */
 final class TechnicianAgenda
 {
