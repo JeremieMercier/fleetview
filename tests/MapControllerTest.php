@@ -282,6 +282,8 @@ final class MapControllerTest extends DbTestCase
             'api_username'     => 'fake_api_user',
             'api_secret'       => 'fake-secret-value',
             'routing_base_url' => 'https://osrm.example.test/' . uniqid(),
+            // Routes need one extra mocked response per vehicle: opt-in
+            'map_show_routes'  => '0',
         ], $overrides));
     }
 
@@ -299,9 +301,11 @@ final class MapControllerTest extends DbTestCase
      * circulation, ~1.6 km) and asset 202 (Martin Sophie, in maintenance,
      * ~9 km) — OSRM makes 202 the fastest despite being the farthest.
      *
-     * @param list<Response> $masternaut_responses
+     * @param list<Response>  $masternaut_responses
+     * @param ?list<Response> $osrm_responses       Table response first, then
+     *        one route response per vehicle when routes are enabled
      */
-    private function mockedController(?array $masternaut_responses = null): MapController
+    private function mockedController(?array $masternaut_responses = null, ?array $osrm_responses = null): MapController
     {
         $masternaut_responses ??= [
             new Response(200, [], json_encode(['items' => [
@@ -334,7 +338,7 @@ final class MapControllerTest extends DbTestCase
             ]])),
         ];
 
-        $osrm_responses = [
+        $osrm_responses ??= [
             new Response(200, [], json_encode([
                 'code'      => 'Ok',
                 'durations' => [[0, 1800, 600]],
@@ -448,6 +452,46 @@ final class MapControllerTest extends DbTestCase
         $this->assertSame([null, null], array_column($payload['vehicles'], 'user_id'));
         // The link itself is still reported: it drives the planned interventions
         $this->assertSame([true, false], array_column($payload['vehicles'], 'technician_linked'));
+    }
+
+    public function testTicketVehiclesDrawsTheRoutesOfTheClosestVehicles(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi(['map_show_routes' => '1']);
+        $ticket = $this->createTicket($this->createGeoLocation()->getID());
+
+        $route = static fn(array $coordinates): Response => new Response(200, [], json_encode([
+            'code'   => 'Ok',
+            'routes' => [['geometry' => ['type' => 'LineString', 'coordinates' => $coordinates]]],
+        ]));
+        $controller = $this->mockedController(null, [
+            new Response(200, [], json_encode([
+                'code'      => 'Ok',
+                'durations' => [[0, 1800, 600]],
+                'distances' => [[0, 12000, 9500]],
+            ])),
+            // Vehicles are ranked 202 then 201: route responses follow that order
+            $route([[2.40, 48.93], [2.38, 48.90], [2.35, 48.85]]),
+            $route([[2.36, 48.87], [2.35, 48.85]]),
+        ]);
+
+        $payload = $this->payload($controller->ticketVehicles(Request::create(''), $ticket->getID()));
+
+        [$first, $second] = $payload['vehicles'];
+        $this->assertSame('202', $first['id']);
+        $this->assertSame([[2.40, 48.93], [2.38, 48.90], [2.35, 48.85]], $first['route_geometry']);
+        $this->assertSame([[2.36, 48.87], [2.35, 48.85]], $second['route_geometry']);
+    }
+
+    public function testTicketVehiclesSkipsRoutesWhenDisabled(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi();
+        $ticket = $this->createTicket($this->createGeoLocation()->getID());
+
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+
+        $this->assertSame([null, null], array_column($payload['vehicles'], 'route_geometry'));
     }
 
     public function testTicketVehiclesFlagsTechniciansAlreadyAssignedToTheTicket(): void

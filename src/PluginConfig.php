@@ -117,6 +117,9 @@ final class PluginConfig extends CommonGLPI
             'popup_title_source' => 'technician',
             // Show the vehicle registration plate in the marker popup
             'popup_show_registration' => '1',
+            // Draw the road route of the 3 closest vehicles (needs the
+            // routing service; one extra request per route)
+            'map_show_routes' => '1',
         ];
     }
 

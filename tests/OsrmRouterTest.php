@@ -92,6 +92,71 @@ final class OsrmRouterTest extends TestCase
         ]));
     }
 
+    private function routeResponse(array $coordinates): Response
+    {
+        return new Response(200, [], json_encode([
+            'code'   => 'Ok',
+            'routes' => [['geometry' => ['type' => 'LineString', 'coordinates' => $coordinates]]],
+        ]));
+    }
+
+    public function testGeometriesAreMappedFromTheRouteResponses(): void
+    {
+        $router = new OsrmRouter($this->fakeBaseUrl(), $this->mockHttpClient([
+            $this->routeResponse([[2.36, 48.86], [2.355, 48.855], [2.35, 48.85]]),
+            $this->routeResponse([[2.40, 48.95], [2.35, 48.85]]),
+        ]));
+
+        $geometries = $router->getRouteGeometriesToPoint(48.85, 2.35, $this->destinations());
+
+        $this->assertSame([
+            [[2.36, 48.86], [2.355, 48.855], [2.35, 48.85]],
+            [[2.40, 48.95], [2.35, 48.85]],
+        ], $geometries);
+
+        // One route request per origin, from the vehicle to the point
+        $this->assertCount(2, $this->history);
+        $uri = $this->history[0]['request']->getUri();
+        $this->assertStringEndsWith('/route/v1/driving/2.360000,48.860000;2.350000,48.850000', $uri->getPath());
+        $this->assertSame('overview=full&geometries=geojson', $uri->getQuery());
+        $this->assertStringEndsWith('/route/v1/driving/2.400000,48.950000;2.350000,48.850000', $this->history[1]['request']->getUri()->getPath());
+    }
+
+    public function testDisabledRouterReturnsNoGeometryWithoutHttpCall(): void
+    {
+        $router = new OsrmRouter('', $this->mockHttpClient([]));
+
+        $this->assertSame([null, null], $router->getRouteGeometriesToPoint(48.85, 2.35, $this->destinations()));
+        $this->assertSame([], $this->history);
+    }
+
+    public function testRouteErrorsDegradeToNullPerOrigin(): void
+    {
+        $router = new OsrmRouter($this->fakeBaseUrl(), $this->mockHttpClient([
+            new Response(200, [], json_encode(['code' => 'NoRoute'])),
+            $this->routeResponse([[2.40, 48.95], [2.35, 48.85]]),
+        ]));
+
+        $this->assertSame(
+            [null, [[2.40, 48.95], [2.35, 48.85]]],
+            $router->getRouteGeometriesToPoint(48.85, 2.35, $this->destinations()),
+        );
+    }
+
+    public function testGeometriesAreCached(): void
+    {
+        $base_url = $this->fakeBaseUrl();
+        $origins  = [$this->destinations()[0]];
+
+        $first = (new OsrmRouter($base_url, $this->mockHttpClient([$this->routeResponse([[2.36, 48.86], [2.35, 48.85]])])))
+            ->getRouteGeometriesToPoint(48.85, 2.35, $origins);
+        $second = (new OsrmRouter($base_url, $this->mockHttpClient([])))
+            ->getRouteGeometriesToPoint(48.85, 2.35, $origins);
+
+        $this->assertSame($first, $second);
+        $this->assertSame([], $this->history);
+    }
+
     public function testDisabledRouterReturnsNullsWithoutHttpCall(): void
     {
         $router = new OsrmRouter('   ', $this->mockHttpClient([]));

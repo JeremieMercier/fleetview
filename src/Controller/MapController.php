@@ -62,6 +62,9 @@ use function Safe\json_decode;
  */
 final class MapController extends AbstractController
 {
+    /** Closest vehicles whose road route is drawn (matches the ranked marker colors) */
+    private const DRAWN_ROUTES = 3;
+
     /**
      * The factories build the API clients from the runtime configuration
      * (radius override included); tests inject factories returning clients
@@ -136,8 +139,8 @@ final class MapController extends AbstractController
 
         // Best-effort driving time estimations; vehicles keep null values
         // when the routing service is disabled or unavailable.
-        $routes = $this->buildOsrmRouter($config['routing_base_url'])
-            ->getRoutesFromPoint($location['latitude'], $location['longitude'], $vehicles);
+        $router = $this->buildOsrmRouter($config['routing_base_url']);
+        $routes = $router->getRoutesFromPoint($location['latitude'], $location['longitude'], $vehicles);
         foreach ($vehicles as $i => &$vehicle) {
             $vehicle['travel_time_min'] = $routes[$i]['duration_min'] ?? null;
             $vehicle['road_distance_km'] = $routes[$i]['distance_km'] ?? null;
@@ -156,6 +159,17 @@ final class MapController extends AbstractController
         // last, ordered by straight-line distance.
         usort($vehicles, static fn(array $a, array $b) => ($a['travel_time_min'] ?? PHP_INT_MAX) <=> ($b['travel_time_min'] ?? PHP_INT_MAX)
             ?: $a['distance_km'] <=> $b['distance_km']);
+
+        // Road geometry of the closest vehicles (the ones with a ranked
+        // marker color), drawn on the map; best effort as well.
+        $geometries = $config['map_show_routes']
+            ? $router->getRouteGeometriesToPoint($location['latitude'], $location['longitude'], array_slice($vehicles, 0, self::DRAWN_ROUTES))
+            : [];
+        foreach ($vehicles as $i => &$vehicle) {
+            $vehicle['route_geometry'] = $geometries[$i] ?? null;
+        }
+
+        unset($vehicle);
 
         // Link vehicles to GLPI users: explicit associations first, optional
         // name matching as fallback. The link drives the planned interventions
