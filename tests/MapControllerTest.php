@@ -587,9 +587,17 @@ final class MapControllerTest extends DbTestCase
         $this->assertNotSame('', $first['begin_label']);
         $this->assertFalse($linked['planned_tasks'][1]['in_progress']);
 
-        // Single-day task: "begin – HH:MM"; the end time is the label's tail
-        $next = $linked['planned_tasks'][1];
-        $this->assertSame($next['begin_label'] . ' – ' . substr($next['end_label'], -5), $next['when_label']);
+        // Same-day task: "begin – HH:MM" (the end time is the label's tail);
+        // both full date-times when the 2-hour slot crosses midnight, which
+        // happens when the suite runs late in the evening
+        $next     = $linked['planned_tasks'][1];
+        $same_day = substr($next['begin'], 0, 10) === substr($next['end'], 0, 10);
+        $this->assertSame(
+            $same_day
+                ? $next['begin_label'] . ' – ' . substr($next['end_label'], -5)
+                : $next['begin_label'] . ' – ' . $next['end_label'],
+            $next['when_label'],
+        );
 
         $this->assertFalse($unlinked['technician_linked']);
         $this->assertSame([], $unlinked['planned_tasks']);
