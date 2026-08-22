@@ -142,6 +142,15 @@
             ) }}
 
             {{ fields.sliderField(
+                'map_show_routes',
+                config['map_show_routes'],
+                __('Draw the road route of the 3 closest vehicles', 'fleetview'),
+                {
+                    'helper': __('Requires the routing service. Routes use the marker colors above; one extra routing request per vehicle.', 'fleetview'),
+                }
+            ) }}
+
+            {{ fields.sliderField(
                 'name_matching_fallback',
                 config['name_matching_fallback'],
                 __('Match technicians by name when a vehicle has no association', 'fleetview'),

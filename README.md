@@ -11,9 +11,10 @@ position des véhicules de la flotte.
 
 La bulle de chaque véhicule indique la distance à vol d'oiseau, le temps et
 la distance par la route (OSRM), et le **planning à venir** du technicien
-associé : tâches de tickets planifiées et événements externes (congés,
-réservations…), triés chronologiquement, avec un badge « en cours »,
-« aujourd'hui » ou « demain ». Les droits GLPI s'appliquent (tâches privées,
+associé : tâches de tickets planifiées et événements externes du planning,
+triés chronologiquement, avec un badge « en cours », « aujourd'hui » ou
+« demain ». L'itinéraire routier des trois véhicules les plus proches est
+tracé sur la carte, dans la couleur de leur marqueur. Les droits GLPI s'appliquent (tâches privées,
 visibilité du planning, entités).
 
 ## Prérequis
@@ -54,8 +55,10 @@ Connect, utilisateur Partner (HTTP Basic) et secret de l'API, rayon de
 recherche, nombre de véhicules et durée du cache. Le secret est chiffré en
 base via GLPIKey (hook `secured_configs`) et n'apparaît jamais dans le dépôt.
 
-Onglet *Affichage* : couleurs des marqueurs, filtres, nombre d'entrées du
-planning listées dans la bulle (`0` masque la section) et prise en compte des
+Onglet *Affichage* : couleurs des marqueurs, filtres, titre de la bulle (nom
+du technicien GLPI associé ou nom du véhicule Masternaut), affichage de la
+plaque d'immatriculation, tracé des itinéraires, nombre d'entrées du planning
+listées dans la bulle (`0` masque la section) et prise en compte des
 événements externes (activée par défaut ; les événements récurrents ne sont
 pas développés).
 
@@ -65,6 +68,58 @@ sont mises en cache côté serveur (cache GLPI, durée configurable, minimum
 
 La documentation PDF de l'API se place dans `docs/api/` (dossier ignoré par
 git).
+
+### Service de routage (OSRM)
+
+Les temps de trajet et les itinéraires sont calculés par un serveur
+[OSRM](https://project-osrm.org) dont l'URL est configurable (onglet
+Fleetview, vide = désactivé). Les coordonnées du lieu du ticket et des
+véhicules sont envoyées à ce serveur.
+
+Par défaut, le plugin pointe sur le serveur de démonstration
+`https://router.project-osrm.org`. Ses contraintes :
+
+- **Serveur de démonstration, sans garantie de service** : le projet OSRM le
+  réserve aux usages modérés et peut bloquer les usages intensifs. Le
+  rate-limit n'est pas publié (ordre de grandeur constaté : ~1 requête/s par
+  IP, au-delà les requêtes sont refusées).
+- Limites du moteur (valeurs par défaut d'`osrm-routed`) : **100 coordonnées
+  par requête `table`**, 500 par requête `route`. Le plugin envoie le lieu du
+  ticket + un point par véhicule affiché : au-delà de 99 véhicules affichés,
+  la requête `table` est refusée et les temps de trajet ne sont plus
+  disponibles.
+
+Volume généré par le plugin : à chaque ouverture de la carte hors cache,
+**1 requête `table`** (temps et distances de tous les véhicules) **+ 1 requête
+`route` par itinéraire tracé** (3 par défaut, envoyées en parallèle). Les
+réponses sont mises en cache 5 minutes par jeu de coordonnées. Pour un usage
+courant (quelques agents, quelques dizaines d'ouvertures par jour), le serveur
+de démonstration suffit. En cas d'erreurs intermittentes (itinéraires
+absents, `429` dans `files/_log/fleetview.log`), désactiver le tracé des
+itinéraires ou passer sur un serveur dédié.
+
+Tout échec du routage est dégradé silencieusement : la carte et les
+marqueurs restent affichés, seuls les temps de trajet et les itinéraires
+manquent (tri à vol d'oiseau).
+
+**Auto-hébergement** : pour un usage soutenu ou pour ne pas envoyer de
+coordonnées à un tiers, OSRM s'installe avec l'image Docker
+`osrm/osrm-backend` et un extrait OpenStreetMap de la zone couverte (par
+exemple depuis [Geofabrik](https://download.geofabrik.de/)) :
+
+```bash
+# Préparation (une fois ; ~4 Go de RAM pour la France entière)
+docker run -t -v "$PWD:/data" osrm/osrm-backend osrm-extract -p /opt/car.lua /data/france-latest.osm.pbf
+docker run -t -v "$PWD:/data" osrm/osrm-backend osrm-partition /data/france-latest.osrm
+docker run -t -v "$PWD:/data" osrm/osrm-backend osrm-customize /data/france-latest.osrm
+
+# Service
+docker run -d -p 5000:5000 -v "$PWD:/data" osrm/osrm-backend osrm-routed --algorithm mld /data/france-latest.osrm
+```
+
+Renseigner ensuite `http://<hôte>:5000` comme URL du service de routage. Les
+limites (`--max-table-size`, `--max-viaroute-size`) deviennent paramétrables
+et il n'y a plus de rate-limit.
 
 ## Structure
 

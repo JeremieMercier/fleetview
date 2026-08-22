@@ -62,6 +62,7 @@ final class PluginConfigTest extends TestCase
         $this->assertSame('1', $defaults['popup_external_events']);
         $this->assertSame('technician', $defaults['popup_title_source']);
         $this->assertSame('1', $defaults['popup_show_registration']);
+        $this->assertSame('1', $defaults['map_show_routes']);
 
         // Map filters are disabled by default
         $this->assertSame('', $defaults['modal_group']);

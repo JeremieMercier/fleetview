@@ -311,6 +311,7 @@
 
     let map = null;
     let vehiclesLayer = null;
+    let routesLayer = null;
     let currentTicketId = null;
     let currentContext = null;
 
@@ -343,6 +344,7 @@
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
             }).addTo(map);
+            routesLayer = L.layerGroup().addTo(map);
             vehiclesLayer = L.layerGroup().addTo(map);
 
             L.marker([latitude, longitude], { icon: ticketIcon(), zIndexOffset: 1000 })
@@ -379,6 +381,7 @@
         const count = document.getElementById('fleetview-count');
 
         hideAlert();
+        routesLayer.clearLayers();
         vehiclesLayer.clearLayers();
         count.textContent = '…';
 
@@ -465,6 +468,19 @@
                 }
                 bounds.push([vehicle.latitude, vehicle.longitude]);
             });
+
+            // Road routes of the ranked vehicles, in their marker color.
+            // Drawn last-to-first so the closest one stays on top.
+            located
+                .map((vehicle, index) => ({ vehicle, color: rankColor(index, data.marker_colors) }))
+                .filter(({ vehicle, color }) => Array.isArray(vehicle.route_geometry) && color !== null)
+                .reverse()
+                .forEach(({ vehicle, color }) => {
+                    const latlngs = vehicle.route_geometry.map(([lng, lat]) => [lat, lng]);
+                    L.polyline(latlngs, { color, weight: 4, opacity: 0.75 }).addTo(routesLayer);
+                    bounds.push(...latlngs);
+                });
+
             map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 });
         } catch {
             count.textContent = '';
