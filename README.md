@@ -23,6 +23,74 @@ visibilité du planning, entités).
 - PHP >= 8.2
 - Un accès à l'API Masternaut
 
+## Installation (production)
+
+En production, le plugin s'installe depuis la **marketplace GLPI**
+(*Configuration → Plugins → Marketplace*, bouton *Installer* puis
+*Activer*) ; les mises à jour y sont ensuite proposées directement.
+
+### Installation manuelle
+
+Sans passer par la marketplace, chaque version est disponible sous forme
+d'archive sur la page
+[Releases](https://github.com/JeremieMercier/fleetview/releases). Elle
+s'installe dans le dossier `marketplace/` de GLPI (le dossier `plugins/`
+reste réservé au développement).
+
+```bash
+# Depuis le dossier marketplace de GLPI, en remplaçant 0.4.0 par la version voulue
+cd /chemin/vers/glpi/marketplace
+
+# 1. Télécharger et extraire l'archive (elle contient le dossier fleetview/)
+curl -LO https://github.com/JeremieMercier/fleetview/releases/download/0.4.0/glpi-fleetview-0.4.0.tar.bz2
+tar -xjf glpi-fleetview-0.4.0.tar.bz2 && rm glpi-fleetview-0.4.0.tar.bz2
+
+# 2. Donner les fichiers à l'utilisateur du serveur web (www-data, apache, nginx…)
+chown -R www-data:www-data fleetview
+
+# 3. Installer puis activer le plugin, en ligne de commande…
+php ../bin/console plugin:install fleetview -u glpi
+php ../bin/console plugin:activate fleetview
+```
+
+… ou depuis l'interface GLPI : *Configuration → Plugins*, boutons
+*Installer* puis *Activer* sur la ligne Fleetview. Renseigner ensuite la
+configuration (voir ci-dessous).
+
+> Le dossier doit s'appeler exactement `marketplace/fleetview`. Si une copie
+> du plugin existe aussi dans `plugins/fleetview`, la supprimer : GLPI n'en
+> charge qu'une.
+
+### Mise à jour manuelle
+
+Pour un plugin installé manuellement, la mise à jour suit le même principe.
+La configuration (accès API, options d'affichage, associations
+véhicule / technicien) est stockée en base et conservée lors de la mise à
+jour. Faire tout de même une sauvegarde de la base avant.
+
+```bash
+cd /chemin/vers/glpi/marketplace
+
+# 1. Remplacer les fichiers par ceux de la nouvelle version
+curl -LO https://github.com/JeremieMercier/fleetview/releases/download/0.4.0/glpi-fleetview-0.4.0.tar.bz2
+rm -rf fleetview
+tar -xjf glpi-fleetview-0.4.0.tar.bz2 && rm glpi-fleetview-0.4.0.tar.bz2
+chown -R www-data:www-data fleetview
+
+# 2. Appliquer la mise à jour (le plugin passe en « À mettre à jour ») et le
+#    réactiver, en ligne de commande…
+php ../bin/console plugin:install fleetview -u glpi
+php ../bin/console plugin:activate fleetview
+
+# 3. Vider le cache GLPI (fichiers JS et traductions versionnés)
+php ../bin/console cache:clear
+```
+
+… ou depuis l'interface GLPI : *Configuration → Plugins*, boutons *Mettre à
+jour* puis *Activer* sur la ligne Fleetview. Si GLPI indique en ligne de
+commande que le plugin est déjà installé, ajouter `--force` à
+`plugin:install`.
+
 ## Installation (développement)
 
 ```bash
