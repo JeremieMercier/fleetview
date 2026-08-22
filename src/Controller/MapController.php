@@ -163,6 +163,7 @@ final class MapController extends AbstractController
         $can_assign = (bool) $ticket->canAssign();
         $mappings   = VehicleMapping::getMap();
         $matcher    = $config['name_matching_fallback'] ? new TechnicianMatcher() : null;
+        $assignees  = array_column($ticket->getUsers(CommonITILActor::ASSIGN), 'users_id');
         $linked     = [];
         foreach ($vehicles as $i => &$vehicle) {
             $user_id = $mappings[$vehicle['id']]
@@ -173,6 +174,8 @@ final class MapController extends AbstractController
             $vehicle['user_id']           = $can_assign ? $user_id : null;
             $vehicle['technician_linked'] = $user_id !== null;
             $vehicle['technician_name']   = $user_id !== null ? getUserName($user_id) : null;
+            // Already assigned (individually) to the ticket
+            $vehicle['assigned']          = $user_id !== null && in_array($user_id, $assignees, false);
         }
 
         unset($vehicle);

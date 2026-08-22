@@ -155,23 +155,23 @@ msgstr "Couleur du marqueur : lieu du ticket"
 
 #: public/js/fleetview.js
 msgid "Assign this technician"
-msgstr "Assigner ce technicien"
+msgstr "Attribuer ce technicien"
 
 #: public/js/fleetview.js
 msgid "Assigned"
-msgstr "Assigné"
+msgstr "Attribué"
 
 #: public/js/fleetview.js
 msgid "%1 has been assigned to the ticket. Reloading…"
-msgstr "%1 a été assigné au ticket. Rechargement…"
+msgstr "%1 a été attribué au ticket. Rechargement…"
 
 #: src/Controller/MapController.php public/js/fleetview.js
 msgid "Unable to assign the technician."
-msgstr "Impossible d'assigner le technicien."
+msgstr "Impossible d'attribuer le technicien."
 
 #: src/Controller/MapController.php
 msgid "You are not allowed to assign this ticket."
-msgstr "Vous n'êtes pas autorisé à assigner ce ticket."
+msgstr "Vous n'êtes pas autorisé à attribuer ce ticket."
 
 #: src/Controller/MapController.php
 msgid "Ticket not found"
@@ -367,3 +367,11 @@ msgstr "Le nom du véhicule est utilisé quand aucun technicien n'est associé a
 #: templates/config_display.html.twig
 msgid "Show the registration plate in the marker popup"
 msgstr "Afficher la plaque d'immatriculation dans la fenêtre du marqueur"
+
+#: public/js/fleetview.js
+msgid "Technician already assigned"
+msgstr "Technicien déjà attribué"
+
+#: public/js/fleetview.js
+msgid "%1 is already assigned to this ticket."
+msgstr "%1 est déjà attribué à ce ticket."

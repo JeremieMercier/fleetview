@@ -450,6 +450,31 @@ final class MapControllerTest extends DbTestCase
         $this->assertSame([true, false], array_column($payload['vehicles'], 'technician_linked'));
     }
 
+    public function testTicketVehiclesFlagsTechniciansAlreadyAssignedToTheTicket(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi();
+        $ticket  = $this->createTicket($this->createGeoLocation()->getID());
+        $tech_id = getItemByTypeName(User::class, 'tech', true);
+        VehicleMapping::save('202', 'Martin Sophie', $tech_id);
+
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $this->assertSame([false, false], array_column($payload['vehicles'], 'assigned'));
+
+        $this->assertGreaterThan(0, (new Ticket_User())->add([
+            'tickets_id' => $ticket->getID(),
+            'users_id'   => $tech_id,
+            'type'       => CommonITILActor::ASSIGN,
+        ]));
+        $ticket->getFromDB($ticket->getID());
+
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        [$linked, $unlinked] = $payload['vehicles'];
+        $this->assertSame('202', $linked['id']);
+        $this->assertTrue($linked['assigned']);
+        $this->assertFalse($unlinked['assigned']);
+    }
+
     public function testTicketVehiclesExposesTheLinkedTechnicianNameAndTitleSource(): void
     {
         $this->login('glpi');
