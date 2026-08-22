@@ -333,7 +333,7 @@ msgid "tomorrow"
 msgstr ""
 
 #: templates/config_display.html.twig
-msgid "Also list external events (leaves, reservations...)"
+msgid "List external events"
 msgstr ""
 
 #: templates/config_display.html.twig
