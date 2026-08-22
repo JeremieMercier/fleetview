@@ -116,6 +116,10 @@
         return document.getElementById('fleetview-modal');
     };
 
+    // Disabled button shown when the technician is already assigned
+    const assignedButtonHtml = () => `<button type="button" class="btn btn-sm btn-outline-secondary mt-2" disabled>`
+        + `<i class="ti ti-check me-1"></i>${__('Technician already assigned', 'fleetview')}</button>`;
+
     const assignTechnician = async (button) => {
         button.disabled = true;
 
@@ -134,6 +138,13 @@
             if (!data.success) {
                 button.disabled = false;
                 showAlert(data.error ?? __('Unable to assign the technician.', 'fleetview'), 'danger');
+                return;
+            }
+
+            if (data.already) {
+                // Assigned meanwhile (another tab, another user): no reload
+                button.outerHTML = assignedButtonHtml();
+                showAlert(__('%1 is already assigned to this ticket.', 'fleetview', data.user_name), 'info');
                 return;
             }
 
@@ -412,8 +423,10 @@
                     : null;
 
                 const assign = data.can_assign && vehicle.user_id !== null
-                    ? `<button type="button" class="btn btn-sm btn-primary mt-2 fleetview-assign" data-users-id="${vehicle.user_id}">`
-                        + `<i class="ti ti-user-plus me-1"></i>${__('Assign this technician', 'fleetview')}</button>`
+                    ? (vehicle.assigned
+                        ? assignedButtonHtml()
+                        : `<button type="button" class="btn btn-sm btn-primary mt-2 fleetview-assign" data-users-id="${vehicle.user_id}">`
+                            + `<i class="ti ti-user-plus me-1"></i>${__('Assign this technician', 'fleetview')}</button>`)
                     : null;
 
                 const status = vehicle.status_label

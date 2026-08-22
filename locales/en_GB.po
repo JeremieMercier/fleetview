@@ -389,3 +389,11 @@ msgstr ""
 #: templates/config_display.html.twig
 msgid "Show the registration plate in the marker popup"
 msgstr ""
+
+#: public/js/fleetview.js
+msgid "Technician already assigned"
+msgstr "Technician already assigned"
+
+#: public/js/fleetview.js
+msgid "%1 is already assigned to this ticket."
+msgstr "%1 is already assigned to this ticket."
