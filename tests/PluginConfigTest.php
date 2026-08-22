@@ -60,6 +60,8 @@ final class PluginConfigTest extends TestCase
         $this->assertSame('0', $defaults['name_matching_fallback']);
         $this->assertSame('6', $defaults['popup_max_tasks']);
         $this->assertSame('1', $defaults['popup_external_events']);
+        $this->assertSame('technician', $defaults['popup_title_source']);
+        $this->assertSame('1', $defaults['popup_show_registration']);
 
         // Map filters are disabled by default
         $this->assertSame('', $defaults['modal_group']);
@@ -119,6 +121,15 @@ final class PluginConfigTest extends TestCase
 
         $this->assertSame(['Zone Alpha', 'Zone Bravo'], PluginConfig::decodeListValue((string) $input['modal_group']));
         $this->assertSame(['IN_CIRCULATION'], PluginConfig::decodeListValue((string) $input['modal_status']));
+    }
+
+    public function testConfigUpdateRejectsUnknownPopupTitleSource(): void
+    {
+        $input = PluginConfig::configUpdate(['_tab' => '2', 'popup_title_source' => 'hacked']);
+        $this->assertSame('technician', $input['popup_title_source']);
+
+        $input = PluginConfig::configUpdate(['_tab' => '2', 'popup_title_source' => 'vehicle']);
+        $this->assertSame('vehicle', $input['popup_title_source']);
     }
 
     public function testConfigUpdateClearsMapFiltersWhenAbsentFromCustomizationForm(): void

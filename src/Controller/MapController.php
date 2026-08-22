@@ -172,6 +172,7 @@ final class MapController extends AbstractController
             $linked[$i]                   = $user_id;
             $vehicle['user_id']           = $can_assign ? $user_id : null;
             $vehicle['technician_linked'] = $user_id !== null;
+            $vehicle['technician_name']   = $user_id !== null ? getUserName($user_id) : null;
         }
 
         unset($vehicle);
@@ -196,6 +197,8 @@ final class MapController extends AbstractController
             'radius_km'     => (float) $config['search_radius'],
             'max_tasks'     => $max_tasks,
             'with_events'   => $with_events,
+            'title_source'  => $config['popup_title_source'] === 'technician' ? 'technician' : 'vehicle',
+            'show_registration' => (bool) $config['popup_show_registration'],
             // User's "due date" warning color, reused for the in-progress
             // badge (the technician is already busy)
             'warning_color' => is_string($_SESSION['glpiduedatewarning_color'] ?? null) ? $_SESSION['glpiduedatewarning_color'] : '#f39f5a',
