@@ -77,6 +77,22 @@
                 }
             ) }}
 
+            {{ fields.dropdownArrayField(
+                'popup_title_source',
+                config['popup_title_source'],
+                title_sources,
+                __('Marker popup title', 'fleetview'),
+                {
+                    'helper': __('The vehicle name is used when no technician is linked to the vehicle.', 'fleetview'),
+                }
+            ) }}
+
+            {{ fields.sliderField(
+                'popup_show_registration',
+                config['popup_show_registration'],
+                __('Show the registration plate in the marker popup', 'fleetview')
+            ) }}
+
             {{ fields.colorField(
                 'marker_color_ticket',
                 config['marker_color_ticket'],

@@ -111,6 +111,12 @@ final class PluginConfig extends CommonGLPI
             // Also list the external events (leaves, reservations...) of
             // the linked technician, merged chronologically with the tasks
             'popup_external_events' => '1',
+            // Marker popup title: the linked GLPI technician name
+            // ('technician', falls back on the vehicle name when no
+            // technician is linked) or the Masternaut vehicle name ('vehicle')
+            'popup_title_source' => 'technician',
+            // Show the vehicle registration plate in the marker popup
+            'popup_show_registration' => '1',
         ];
     }
 
@@ -315,6 +321,10 @@ final class PluginConfig extends CommonGLPI
                 'IN_CIRCULATION' => self::getStatusLabel('IN_CIRCULATION'),
                 'IN_MAINTENANCE' => self::getStatusLabel('IN_MAINTENANCE'),
             ],
+            'title_sources'     => [
+                'technician' => __('Linked GLPI technician name', 'fleetview'),
+                'vehicle'    => __('Masternaut vehicle name', 'fleetview'),
+            ],
         ]);
     }
 
@@ -380,6 +390,10 @@ final class PluginConfig extends CommonGLPI
                     static fn($value) => !in_array($value, ['', '0', 0], true),
                 ));
                 $input[$key] = $values === [] ? '' : json_encode($values);
+            }
+
+            if (isset($input['popup_title_source']) && !in_array($input['popup_title_source'], ['vehicle', 'technician'], true)) {
+                $input['popup_title_source'] = 'technician';
             }
         }
 

@@ -421,8 +421,19 @@
                         + `${_.escape(vehicle.status_label)}`
                     : null;
 
+                // Vehicle name, with the plate appended when enabled (unless
+                // the plate already is the name, for unnamed vehicles)
+                const plate = data.show_registration && vehicle.registration && vehicle.registration !== vehicle.label
+                    ? ` (${_.escape(vehicle.registration)})`
+                    : '';
+                const vehicleName = _.escape(vehicle.label) + plate;
+
+                // Popup title per configuration; the vehicle name is kept
+                // as a secondary line when the technician name is the title
+                const technicianTitle = data.title_source === 'technician' && vehicle.technician_name;
                 const details = [
-                    `<strong>${_.escape(vehicle.label)}</strong>`,
+                    `<strong>${technicianTitle ? _.escape(vehicle.technician_name) : vehicleName}</strong>`,
+                    technicianTitle ? `<i class="ti ti-car"></i> ${vehicleName}` : null,
                     status,
                     vehicle.driver_name ? `<i class="ti ti-user"></i> ${_.escape(vehicle.driver_name)}` : null,
                     `<i class="ti ti-route"></i> ${__('%1 km as the crow flies', 'fleetview', vehicle.distance_km)}`,

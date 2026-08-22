@@ -450,6 +450,35 @@ final class MapControllerTest extends DbTestCase
         $this->assertSame([true, false], array_column($payload['vehicles'], 'technician_linked'));
     }
 
+    public function testTicketVehiclesExposesTheLinkedTechnicianNameAndTitleSource(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi(['popup_title_source' => 'technician']);
+        $ticket  = $this->createTicket($this->createGeoLocation()->getID());
+        $tech_id = getItemByTypeName(User::class, 'tech', true);
+        VehicleMapping::save('202', 'Martin Sophie', $tech_id);
+
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+
+        $this->assertSame('technician', $payload['title_source']);
+        $this->assertTrue($payload['show_registration']);
+        [$linked, $unlinked] = $payload['vehicles'];
+        $this->assertSame(getUserName($tech_id), $linked['technician_name']);
+        $this->assertNull($unlinked['technician_name']);
+    }
+
+    public function testTicketVehiclesHonoursTheVehicleNameTitleAndHiddenRegistration(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi(['popup_title_source' => 'vehicle', 'popup_show_registration' => '0']);
+        $ticket = $this->createTicket($this->createGeoLocation()->getID());
+
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+
+        $this->assertSame('vehicle', $payload['title_source']);
+        $this->assertFalse($payload['show_registration']);
+    }
+
     public function testTicketVehiclesListsPlannedTasksOfLinkedTechnicians(): void
     {
         $this->login('glpi');

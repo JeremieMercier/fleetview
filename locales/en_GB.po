@@ -369,3 +369,23 @@ msgstr "Events the technician owns or is invited to, merged with the tasks. GLPI
 #: public/js/fleetview.js
 msgid "Planned interventions and events"
 msgstr "Planned interventions and events"
+
+#: src/PluginConfig.php
+msgid "Masternaut vehicle name"
+msgstr ""
+
+#: src/PluginConfig.php
+msgid "Linked GLPI technician name"
+msgstr ""
+
+#: templates/config_display.html.twig
+msgid "Marker popup title"
+msgstr ""
+
+#: templates/config_display.html.twig
+msgid "The vehicle name is used when no technician is linked to the vehicle."
+msgstr ""
+
+#: templates/config_display.html.twig
+msgid "Show the registration plate in the marker popup"
+msgstr ""
