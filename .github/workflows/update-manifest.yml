@@ -31,7 +31,7 @@ jobs:
       # Tag from the manual input, or from the tag push that ran "Publish release"
       TAG: "${{ inputs.tag || github.event.workflow_run.head_branch }}"
     steps:
-      - uses: "actions/checkout@v4"
+      - uses: "actions/checkout@v7"
         with:
           ref: "main"
 
