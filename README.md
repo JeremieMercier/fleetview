@@ -136,6 +136,28 @@ technicien GLPI (association explicite ou correspondance par nom) sont
 affichés ; le filtre s'applique avant le classement des plus proches et la
 limite du nombre de véhicules.
 
+### Droits
+
+La carte expose des données de flotte (positions GPS en temps réel, noms des
+conducteurs) : elle est réservée aux profils disposant du droit *Carte des
+techniciens à proximité* (onglet *Fleetview* de la fiche Profil, droit
+`plugin_fleetview_map`). Sans ce droit, le bouton n'apparaît pas et les
+routes du plugin répondent 403, quel que soit le droit de lecture sur le
+ticket. À l'installation, le droit est accordé aux profils autorisés à
+attribuer des tickets, à d'autres ou à eux-mêmes (technicien, hotliner,
+superviseur, admin, super-admin) ; les profils self-service et lecture seule
+ne l'ont pas. Les personnalisations ultérieures sont conservées à la mise à
+jour. L'attribution depuis la carte requiert en plus le droit d'attribuer
+les tickets.
+
+Le planning listé dans la bulle (tâches planifiées et événements externes)
+suit le droit GLPI *Planning* du profil (onglet *Assistance*) : « voir tous
+les plannings » affiche celui de tous les techniciens, « voir le planning de
+mon groupe » uniquement celui des membres des groupes de l'utilisateur, « voir
+mon planning » le sien seulement. Quand l'utilisateur n'a pas le droit de
+consulter le planning du technicien associé, la section est simplement masquée
+dans la bulle.
+
 L'API « Live Position Latest » est limitée à 1 requête / 15 s : les positions
 sont mises en cache côté serveur (cache GLPI, durée configurable, minimum
 15 s).
@@ -199,6 +221,7 @@ et il n'y a plus de rate-limit.
 
 - `setup.php` / `hook.php` — déclaration et cycle de vie du plugin
 - `src/PluginConfig.php` — configuration (onglet + stockage `glpi_configs`)
+- `src/Profile.php` — droit *Carte des techniciens à proximité* (onglet de la fiche Profil)
 - `src/Controller/MapController.php` — endpoints AJAX (contexte ticket, positions véhicules)
 - `src/Masternaut/MasternautClient.php` — client API MCF Connect (Find Nearest Vehicle + Live Position Latest, cache)
 - `js/fleetview.js` — bouton, modale et carte Leaflet

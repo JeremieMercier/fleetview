@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (explicit association or name matching) are displayed.
 - "Show vehicles without a linked technician" display setting, the default
   state of the modal toggle. Off by default.
+- "Nearby technicians map" right (`plugin_fleetview_map`), managed in a
+  Fleetview tab of the profile form. Granted on install to the profiles
+  allowed to assign tickets, to others or to themselves.
 
 ### Changed
 
@@ -21,6 +24,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   setting to restore the previous behavior. The filter is applied before the
   closest vehicles are ranked and before the maximum number of vehicles is
   applied, so the top 3 and the result limit only count displayed vehicles.
+
+### Security
+
+- The map endpoints (ticket context, nearby vehicles, assignment) now require
+  the new map right: live fleet positions and driver names were reachable by
+  any user allowed to view the ticket, requesters included (GLPI marketplace
+  security review, [#12](https://github.com/JeremieMercier/fleetview/issues/12)).
+- The planned interventions of the marker popup follow the GLPI planning
+  right (see all / see group / see mine), as the external events already did;
+  the section is hidden for technicians whose planning the user may not
+  consult.
 
 ## [0.4.0] - 2026-08-22
 

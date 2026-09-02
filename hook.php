@@ -32,6 +32,7 @@
  */
 
 use GlpiPlugin\Fleetview\PluginConfig;
+use GlpiPlugin\Fleetview\Profile as FleetviewProfile;
 use GlpiPlugin\Fleetview\VehicleMapping;
 
 /**
@@ -43,6 +44,7 @@ function plugin_fleetview_install(): bool
 
     PluginConfig::install();
     VehicleMapping::install($migration);
+    FleetviewProfile::install();
 
     return true;
 }
@@ -56,6 +58,7 @@ function plugin_fleetview_uninstall(): bool
 
     PluginConfig::uninstall();
     VehicleMapping::uninstall($migration);
+    FleetviewProfile::uninstall();
 
     return true;
 }

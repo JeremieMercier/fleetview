@@ -384,6 +384,14 @@ msgstr ""
 msgid "Draw the road route of the 3 closest vehicles"
 msgstr ""
 
+#: src/Profile.php
+msgid "Nearby technicians map"
+msgstr ""
+
+#: src/Controller/MapController.php
+msgid "You are not allowed to view the fleet map."
+msgstr ""
+
 #: templates/config_display.html.twig
 msgid "Show vehicles without a linked technician"
 msgstr ""

@@ -41,16 +41,20 @@ use Glpi\Tests\DbTestCase;
 use GlpiPlugin\Fleetview\Controller\MapController;
 use GlpiPlugin\Fleetview\Masternaut\MasternautClient;
 use GlpiPlugin\Fleetview\PluginConfig;
+use GlpiPlugin\Fleetview\Profile;
 use GlpiPlugin\Fleetview\Routing\OsrmRouter;
 use GlpiPlugin\Fleetview\VehicleMapping;
 use GuzzleHttp\Client;
 use GuzzleHttp\Handler\MockHandler;
 use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\Response;
+use Group;
+use Group_User;
 use Location;
 use Planning;
 use PlanningEventCategory;
 use PlanningExternalEvent;
+use Session;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Ticket;
@@ -536,8 +540,37 @@ final class MapControllerTest extends DbTestCase
         $this->assertSame([], $payload['vehicles']);
     }
 
-    public function testTicketVehiclesHidesAssignmentsWithoutTheRight(): void
+    public function testMapEndpointsRequireTheMapRightWhateverTheTicketRights(): void
     {
+        $this->login('glpi');
+        $this->configurePluginApi();
+        $ticket = $this->createTicket($this->createGeoLocation()->getID());
+        $this->assertTrue($ticket->canViewItem());
+        $this->assertNotEmpty($ticket->canAssign());
+
+        $_SESSION['glpiactiveprofile'][Profile::RIGHTNAME] = 0;
+        $controller = $this->mockedController();
+
+        $response = $controller->ticketContext($ticket->getID());
+        $this->assertSame(403, $response->getStatusCode());
+        $this->assertArrayNotHasKey('location', $this->payload($response));
+
+        $response = $controller->ticketVehicles(Request::create(''), $ticket->getID());
+        $this->assertSame(403, $response->getStatusCode());
+        $this->assertArrayNotHasKey('vehicles', $this->payload($response));
+
+        $response = $controller->assignTechnician(
+            Request::create('', 'POST', [], [], [], [], json_encode(['users_id' => getItemByTypeName(User::class, 'tech', true)])),
+            $ticket->getID(),
+        );
+        $this->assertSame(403, $response->getStatusCode());
+        $this->assertSame(0, $ticket->countUsers(CommonITILActor::ASSIGN));
+    }
+
+    public function testRequestersHaveNoAccessToTheFleetData(): void
+    {
+        // The security review scenario: a self-service requester opening
+        // the vehicles endpoint of their own geolocated ticket
         $this->login('glpi');
         $this->configurePluginApi();
         $requester_id = getItemByTypeName(User::class, 'post-only', true);
@@ -545,6 +578,26 @@ final class MapControllerTest extends DbTestCase
         VehicleMapping::save('202', 'Martin Sophie', 4242);
 
         $this->login('post-only');
+        $this->assertTrue($ticket->canViewItem());
+        $this->assertSame(0, (int) ($_SESSION['glpiactiveprofile'][Profile::RIGHTNAME] ?? 0));
+
+        $controller = $this->mockedController();
+        $this->assertSame(403, $controller->ticketContext($ticket->getID())->getStatusCode());
+
+        $response = $controller->ticketVehicles(Request::create(''), $ticket->getID());
+        $this->assertSame(403, $response->getStatusCode());
+        $this->assertArrayNotHasKey('vehicles', $this->payload($response));
+    }
+
+    public function testTicketVehiclesHidesAssignmentsWithoutTheAssignRight(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi();
+        $ticket = $this->createTicket($this->createGeoLocation()->getID());
+        VehicleMapping::save('202', 'Martin Sophie', 4242);
+
+        // Map right kept, ticket assignment right removed
+        $_SESSION['glpiactiveprofile']['ticket'] &= ~Ticket::ASSIGN;
         $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
 
         $this->assertFalse($payload['can_assign']);
@@ -716,7 +769,11 @@ final class MapControllerTest extends DbTestCase
         $public = $this->createPlannedTask($job, $tech_id, 24, 26);
         $this->createPlannedTask($job, $tech_id, 48, 50, ['is_private' => 1]);
 
+        // Map right and "see all plannings" granted, private tasks right
+        // still that of the requester profile
         $this->login('post-only');
+        $_SESSION['glpiactiveprofile'][Profile::RIGHTNAME] = READ;
+        $_SESSION['glpiactiveprofile']['planning']         = Planning::READALL;
         $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
 
         $this->assertSame([$public], array_column($payload['vehicles'][0]['planned_tasks'], 'id'));
@@ -866,20 +923,77 @@ final class MapControllerTest extends DbTestCase
         $this->assertSame('Réunion fictive', $entries[2]['ticket_name']);
     }
 
-    public function testTicketVehiclesHidesExternalEventsWithoutPlanningRights(): void
+    public function testTicketVehiclesHidesThePlanningSectionWithoutPlanningRights(): void
     {
         $this->login('glpi');
         $this->configurePluginApi();
-        $requester_id = getItemByTypeName(User::class, 'post-only', true);
-        $ticket  = $this->createTicket($this->createGeoLocation()->getID(), $requester_id);
+        $ticket  = $this->createTicket($this->createGeoLocation()->getID());
         $tech_id = getItemByTypeName(User::class, 'tech', true);
         VehicleMapping::save('202', 'Martin Sophie', $tech_id);
+        $this->createPlannedTask($this->createTicket(), $tech_id, 24, 26);
         $this->createExternalEvent($tech_id, 10, 12);
 
-        $this->login('post-only');
+        // "See my planning" only: the linked technician is somebody else
+        $_SESSION['glpiactiveprofile']['planning'] = Planning::READMY;
         $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
 
-        $this->assertSame([], $payload['vehicles'][0]['planned_tasks']);
+        [$linked, $unlinked] = $payload['vehicles'];
+        $this->assertTrue($linked['technician_linked']);
+        $this->assertNull($linked['planned_tasks']);
+        $this->assertSame(0, $linked['planned_tasks_more']);
+        // Unlinked vehicles keep their "not linked" section
+        $this->assertSame([], $unlinked['planned_tasks']);
+
+        // No planning right at all: hidden as well
+        $_SESSION['glpiactiveprofile']['planning'] = 0;
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $this->assertNull($payload['vehicles'][0]['planned_tasks']);
+    }
+
+    public function testTicketVehiclesShowsOwnPlanningWithSeeMineOnly(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi();
+        $ticket = $this->createTicket($this->createGeoLocation()->getID());
+        $me     = (int) Session::getLoginUserID();
+        VehicleMapping::save('202', 'Martin Sophie', $me);
+        $task = $this->createPlannedTask($this->createTicket(), $me, 24, 26);
+
+        $_SESSION['glpiactiveprofile']['planning'] = Planning::READMY;
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+
+        $this->assertSame([$task], array_column($payload['vehicles'][0]['planned_tasks'], 'id'));
+    }
+
+    public function testTicketVehiclesLimitsThePlanningToGroupMembersWithSeeGroup(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi();
+        $ticket  = $this->createTicket($this->createGeoLocation()->getID());
+        $tech_id = getItemByTypeName(User::class, 'tech', true);
+        $other   = new User();
+        $other_id = $other->add(['name' => 'fake_other_' . uniqid(), 'is_active' => 1]);
+        $this->assertGreaterThan(0, $other_id);
+        VehicleMapping::save('202', 'Martin Sophie', $tech_id);
+        VehicleMapping::save('201', 'Dupont Jean', $other_id);
+        $tech_task = $this->createPlannedTask($this->createTicket(), $tech_id, 24, 26);
+        $this->createPlannedTask($this->createTicket(), $other_id, 24, 26);
+
+        // The current user and "tech" share a group, "other" does not
+        $group    = new Group();
+        $group_id = $group->add(['name' => 'fake_group_' . uniqid(), 'entities_id' => $this->rootEntityId(), 'is_recursive' => 1]);
+        $this->assertGreaterThan(0, $group_id);
+        foreach ([(int) Session::getLoginUserID(), $tech_id] as $users_id) {
+            $this->assertGreaterThan(0, (new Group_User())->add(['groups_id' => $group_id, 'users_id' => $users_id]));
+        }
+
+        $_SESSION['glpigroups']                    = [$group_id];
+        $_SESSION['glpiactiveprofile']['planning'] = Planning::READGROUP | Planning::READMY;
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+
+        $by_id = array_column($payload['vehicles'], null, 'id');
+        $this->assertSame([$tech_task], array_column($by_id['202']['planned_tasks'], 'id'));
+        $this->assertNull($by_id['201']['planned_tasks']);
     }
 
     public function testTicketVehiclesSkipsExternalEventsWhenDisabled(): void

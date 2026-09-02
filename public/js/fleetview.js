@@ -475,7 +475,11 @@
                     `<i class="ti ti-route"></i> ${__('%1 km as the crow flies', 'fleetview', vehicle.distance_km)}`,
                     travel ? `<i class="ti ti-car"></i> ${travel}` : null,
                     `<i class="ti ti-clock"></i> ${_.escape(formatDate(vehicle.updated_at))}`,
-                    data.max_tasks > 0 ? plannedTasksHtml(vehicle, data.warning_color, data.with_events) : null,
+                    // Section hidden when disabled, or when the user may not
+                    // consult this technician's planning (null)
+                    data.max_tasks > 0 && vehicle.planned_tasks !== null
+                        ? plannedTasksHtml(vehicle, data.warning_color, data.with_events)
+                        : null,
                     assign,
                 ].filter(Boolean).join('<br>');
 
