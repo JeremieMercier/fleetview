@@ -38,12 +38,12 @@ s'installe dans le dossier `marketplace/` de GLPI (le dossier `plugins/`
 reste réservé au développement).
 
 ```bash
-# Depuis le dossier marketplace de GLPI, en remplaçant 0.4.0 par la version voulue
+# Depuis le dossier marketplace de GLPI, en remplaçant 0.5.0 par la version voulue
 cd /chemin/vers/glpi/marketplace
 
 # 1. Télécharger et extraire l'archive (elle contient le dossier fleetview/)
-curl -LO https://github.com/JeremieMercier/fleetview/releases/download/0.4.0/glpi-fleetview-0.4.0.tar.bz2
-tar -xjf glpi-fleetview-0.4.0.tar.bz2 && rm glpi-fleetview-0.4.0.tar.bz2
+curl -LO https://github.com/JeremieMercier/fleetview/releases/download/0.5.0/glpi-fleetview-0.5.0.tar.bz2
+tar -xjf glpi-fleetview-0.5.0.tar.bz2 && rm glpi-fleetview-0.5.0.tar.bz2
 
 # 2. Donner les fichiers à l'utilisateur du serveur web (www-data, apache, nginx…)
 chown -R www-data:www-data fleetview
@@ -72,9 +72,9 @@ jour. Faire tout de même une sauvegarde de la base avant.
 cd /chemin/vers/glpi/marketplace
 
 # 1. Remplacer les fichiers par ceux de la nouvelle version
-curl -LO https://github.com/JeremieMercier/fleetview/releases/download/0.4.0/glpi-fleetview-0.4.0.tar.bz2
+curl -LO https://github.com/JeremieMercier/fleetview/releases/download/0.5.0/glpi-fleetview-0.5.0.tar.bz2
 rm -rf fleetview
-tar -xjf glpi-fleetview-0.4.0.tar.bz2 && rm glpi-fleetview-0.4.0.tar.bz2
+tar -xjf glpi-fleetview-0.5.0.tar.bz2 && rm glpi-fleetview-0.5.0.tar.bz2
 chown -R www-data:www-data fleetview
 
 # 2. Appliquer la mise à jour (le plugin passe en « À mettre à jour ») et le

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-02
+
 ### Added
 
 - "Vehicles without a technician" toggle in the nearby technicians modal, next
@@ -95,7 +97,8 @@ First tagged release.
 - Unit and functional tests, GLPI quality tooling (php-cs-fixer, phpstan,
   rector, lints).
 
-[Unreleased]: https://github.com/JeremieMercier/fleetview/compare/0.4.0...HEAD
+[Unreleased]: https://github.com/JeremieMercier/fleetview/compare/0.5.0...HEAD
+[0.5.0]: https://github.com/JeremieMercier/fleetview/compare/0.4.0...0.5.0
 [0.4.0]: https://github.com/JeremieMercier/fleetview/compare/0.3.0...0.4.0
 [0.3.0]: https://github.com/JeremieMercier/fleetview/compare/0.2.13...0.3.0
 [0.2.13]: https://github.com/JeremieMercier/fleetview/releases/tag/0.2.13
