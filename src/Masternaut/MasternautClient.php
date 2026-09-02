@@ -162,7 +162,7 @@ final class MasternautClient
                 'status'       => $info['status'] ?? null,
             ];
 
-            if ($keep !== null && !$keep($vehicle)) {
+            if ($keep instanceof Closure && !$keep($vehicle)) {
                 continue;
             }
 
