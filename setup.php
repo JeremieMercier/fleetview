@@ -33,6 +33,7 @@
 
 use Glpi\Plugin\Hooks;
 use GlpiPlugin\Fleetview\PluginConfig;
+use GlpiPlugin\Fleetview\Profile as FleetviewProfile;
 
 /** @phpstan-ignore theCodingMachineSafe.function (safe to assume this isn't already defined) */
 define('PLUGIN_FLEETVIEW_VERSION', '0.4.0');
@@ -63,6 +64,9 @@ function plugin_init_fleetview(): void
 
     // Dedicated configuration page (wrench icon on the plugin card)
     $PLUGIN_HOOKS[Hooks::CONFIG_PAGE]['fleetview'] = 'front/config.form.php';
+
+    // "Nearby technicians map" right, in a tab of the profile form
+    Plugin::registerClass(FleetviewProfile::class, ['addtabon' => Profile::class]);
 
     // Ticket form integration (button + map modal); the JS guards itself so it
     // only acts on the ticket form.

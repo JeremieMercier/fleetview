@@ -388,6 +388,14 @@ msgstr "%1 est déjà attribué à ce ticket."
 msgid "Draw the road route of the 3 closest vehicles"
 msgstr "Tracer l'itinéraire routier des 3 véhicules les plus proches"
 
+#: src/Profile.php
+msgid "Nearby technicians map"
+msgstr "Carte des techniciens à proximité"
+
+#: src/Controller/MapController.php
+msgid "You are not allowed to view the fleet map."
+msgstr "Vous n'êtes pas autorisé à consulter la carte de la flotte."
+
 #: templates/config_display.html.twig
 msgid "Show vehicles without a linked technician"
 msgstr "Afficher les véhicules sans technicien associé"

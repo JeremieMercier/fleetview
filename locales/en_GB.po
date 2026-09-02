@@ -410,6 +410,14 @@ msgstr "%1 is already assigned to this ticket."
 msgid "Draw the road route of the 3 closest vehicles"
 msgstr "Draw the road route of the 3 closest vehicles"
 
+#: src/Profile.php
+msgid "Nearby technicians map"
+msgstr "Nearby technicians map"
+
+#: src/Controller/MapController.php
+msgid "You are not allowed to view the fleet map."
+msgstr "You are not allowed to view the fleet map."
+
 #: templates/config_display.html.twig
 msgid "Show vehicles without a linked technician"
 msgstr "Show vehicles without a linked technician"

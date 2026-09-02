@@ -36,6 +36,7 @@ namespace GlpiPlugin\Fleetview;
 use DBmysql;
 use Glpi\DBAL\QueryExpression;
 use Glpi\DBAL\QueryFunction;
+use Group_User;
 use Html;
 use Planning;
 use PlanningEventCategory;
@@ -83,6 +84,7 @@ final class TechnicianAgenda
     public static function getPlannedTasks(array $users_ids, int $limit, bool $with_events = false): array
     {
         $users_ids = array_values(array_unique(array_filter($users_ids, static fn(int $id) => $id > 0)));
+        $users_ids = self::filterViewablePlannings($users_ids);
         if ($users_ids === [] || $limit <= 0) {
             return [];
         }
@@ -110,6 +112,47 @@ final class TechnicianAgenda
         }
 
         return $agenda;
+    }
+
+    /**
+     * Users whose planning the current user may consult, according to the
+     * GLPI planning right: everyone ("see all"), the members of the user's
+     * groups ("see group"), or only themselves ("see mine"). The same rule
+     * drives the GLPI planning view and the external events visibility.
+     *
+     * @param list<int> $users_ids
+     *
+     * @return list<int>
+     */
+    public static function filterViewablePlannings(array $users_ids): array
+    {
+        if (Session::haveRight(Planning::$rightname, Planning::READALL)) {
+            return $users_ids;
+        }
+
+        $viewable = [];
+        if (Session::haveRight(Planning::$rightname, Planning::READMY)) {
+            $viewable[] = (int) Session::getLoginUserID();
+        }
+
+        if (Session::haveRight(Planning::$rightname, Planning::READGROUP)) {
+            $groups = [];
+            foreach ((array) ($_SESSION['glpigroups'] ?? []) as $groups_id) {
+                if (is_numeric($groups_id)) {
+                    $groups[] = (int) $groups_id;
+                }
+            }
+
+            if ($groups !== []) {
+                foreach (Group_User::getGroupUsers($groups) as $member) {
+                    if (is_array($member) && is_numeric($member['id'] ?? null)) {
+                        $viewable[] = (int) $member['id'];
+                    }
+                }
+            }
+        }
+
+        return array_values(array_intersect($users_ids, $viewable));
     }
 
     /**

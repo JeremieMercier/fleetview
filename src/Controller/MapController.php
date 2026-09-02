@@ -39,6 +39,7 @@ use CommonITILActor;
 use GlpiPlugin\Fleetview\Masternaut\MasternautApiException;
 use GlpiPlugin\Fleetview\Masternaut\MasternautClient;
 use GlpiPlugin\Fleetview\PluginConfig;
+use GlpiPlugin\Fleetview\Profile;
 use GlpiPlugin\Fleetview\Routing\OsrmRouter;
 use GlpiPlugin\Fleetview\TechnicianAgenda;
 use GlpiPlugin\Fleetview\TechnicianMatcher;
@@ -83,11 +84,16 @@ final class MapController extends AbstractController
 
     /**
      * Geographic context of a ticket: coordinates of its location, if any.
-     * Used by the JS to decide whether the map button should be displayed.
+     * Used by the JS to decide whether the map button should be displayed
+     * (a 403 hides it as well).
      */
     #[Route(path: 'ticket/{id}/context', name: 'ticket_context', requirements: ['id' => '\d+'], methods: ['GET'])]
     public function ticketContext(int $id): JsonResponse
     {
+        if (!Profile::canViewMap()) {
+            return $this->forbiddenResponse();
+        }
+
         $ticket = Ticket::getById($id);
         if ($ticket === false || !$ticket->canViewItem()) {
             return new JsonResponse(['error' => 'Ticket not found'], Response::HTTP_NOT_FOUND);
@@ -107,6 +113,10 @@ final class MapController extends AbstractController
     #[Route(path: 'ticket/{id}/vehicles', name: 'ticket_vehicles', requirements: ['id' => '\d+'], methods: ['GET'])]
     public function ticketVehicles(Request $request, int $id): JsonResponse
     {
+        if (!Profile::canViewMap()) {
+            return $this->forbiddenResponse();
+        }
+
         $ticket = Ticket::getById($id);
         if ($ticket === false || !$ticket->canViewItem()) {
             return new JsonResponse(['error' => 'Ticket not found'], Response::HTTP_NOT_FOUND);
@@ -211,15 +221,22 @@ final class MapController extends AbstractController
 
         unset($vehicle);
 
-        // Planned interventions of the linked technicians (0 = disabled)
+        // Planned interventions of the linked technicians (0 = disabled).
+        // The section is hidden (null) for technicians whose planning the
+        // user may not consult, per the GLPI planning right.
         $max_tasks   = max(0, (int) $config['popup_max_tasks']);
         $with_events = (bool) $config['popup_external_events'];
-        $agenda      = $max_tasks > 0
-            ? TechnicianAgenda::getPlannedTasks(array_values(array_filter($linked)), $max_tasks, $with_events)
+        $viewable    = $max_tasks > 0
+            ? TechnicianAgenda::filterViewablePlannings(array_values(array_filter($linked)))
+            : [];
+        $agenda      = $viewable !== []
+            ? TechnicianAgenda::getPlannedTasks($viewable, $max_tasks, $with_events)
             : [];
         foreach ($vehicles as $i => &$vehicle) {
-            $entry = $linked[$i] !== null ? ($agenda[$linked[$i]] ?? null) : null;
-            $vehicle['planned_tasks']      = $max_tasks > 0 ? ($entry['tasks'] ?? []) : null;
+            $users_id = $linked[$i];
+            $hidden   = $max_tasks <= 0 || ($users_id !== null && !in_array($users_id, $viewable, true));
+            $entry    = $users_id !== null ? ($agenda[$users_id] ?? null) : null;
+            $vehicle['planned_tasks']      = $hidden ? null : ($entry['tasks'] ?? []);
             $vehicle['planned_tasks_more'] = $entry['more'] ?? 0;
         }
 
@@ -253,6 +270,10 @@ final class MapController extends AbstractController
     #[Route(path: 'ticket/{id}/assign', name: 'ticket_assign', requirements: ['id' => '\d+'], methods: ['POST'])]
     public function assignTechnician(Request $request, int $id): JsonResponse
     {
+        if (!Profile::canViewMap()) {
+            return $this->forbiddenResponse();
+        }
+
         $ticket = Ticket::getById($id);
         if ($ticket === false || !$ticket->canViewItem()) {
             return new JsonResponse(['error' => __('Ticket not found', 'fleetview')], Response::HTTP_NOT_FOUND);
@@ -300,6 +321,19 @@ final class MapController extends AbstractController
             'already'   => $already,
             'user_name' => $user->getFriendlyName(),
         ]);
+    }
+
+    /**
+     * The map right is checked before anything else: without it, the fleet
+     * data (live positions, driver names) must not be reachable, whatever
+     * the ticket rights.
+     */
+    private function forbiddenResponse(): JsonResponse
+    {
+        return new JsonResponse(
+            ['error' => __('You are not allowed to view the fleet map.', 'fleetview')],
+            Response::HTTP_FORBIDDEN,
+        );
     }
 
     /**
