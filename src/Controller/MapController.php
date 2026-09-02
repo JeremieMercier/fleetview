@@ -60,6 +60,9 @@ use function Safe\json_decode;
  * form. Routes are exposed under `/plugins/fleetview/`. Authentication is
  * enforced by the GLPI firewall (default strategy: authenticated user).
  */
+/**
+ * @phpstan-import-type Vehicle from MasternautClient
+ */
 final class MapController extends AbstractController
 {
     /** Closest vehicles whose road route is drawn (matches the ranked marker colors) */
@@ -122,13 +125,34 @@ final class MapController extends AbstractController
             $config['search_radius'] = (string) min(500, max(1, (int) $radius));
         }
 
+        // Optional override of the unlinked vehicles toggle from the modal
+        // (the configured value is its default state)
+        $show_unlinked = (bool) $config['modal_show_unlinked'];
+        $toggle        = $request->query->get('show_unlinked');
+        if (in_array($toggle, ['0', '1'], true)) {
+            $show_unlinked = $toggle === '1';
+        }
+
         $client = $this->buildMasternautClient($config);
         if (!$client->isConfigured()) {
             return new JsonResponse(['configured' => false, 'vehicles' => []]);
         }
 
+        // Link vehicles to GLPI users: explicit associations first, optional
+        // name matching as fallback. The link drives the unlinked vehicles
+        // filter and the planned interventions of the popup; the assignment
+        // button additionally needs the right.
+        $mappings = VehicleMapping::getMap();
+        $matcher  = $config['name_matching_fallback'] ? new TechnicianMatcher() : null;
+
         try {
-            $vehicles = $client->getNearbyVehicles($location['latitude'], $location['longitude']);
+            $vehicles = $client->getNearbyVehicles(
+                $location['latitude'],
+                $location['longitude'],
+                // Filtered before the closest ones are kept, so the top 3
+                // ranking and `max_results` only count displayed vehicles
+                fn(array $vehicle): bool => $show_unlinked || $this->resolveTechnician($vehicle, $mappings, $matcher) !== null,
+            );
         } catch (MasternautApiException $masternautApiException) {
             return new JsonResponse([
                 'configured' => true,
@@ -171,18 +195,11 @@ final class MapController extends AbstractController
 
         unset($vehicle);
 
-        // Link vehicles to GLPI users: explicit associations first, optional
-        // name matching as fallback. The link drives the planned interventions
-        // of the popup; the assignment button additionally needs the right.
         $can_assign = (bool) $ticket->canAssign();
-        $mappings   = VehicleMapping::getMap();
-        $matcher    = $config['name_matching_fallback'] ? new TechnicianMatcher() : null;
         $assignees  = array_column($ticket->getUsers(CommonITILActor::ASSIGN), 'users_id');
         $linked     = [];
         foreach ($vehicles as $i => &$vehicle) {
-            $user_id = $mappings[$vehicle['id']]
-                ?? $matcher?->match($vehicle['label'])
-                ?? $matcher?->match($vehicle['driver_name']);
+            $user_id = $this->resolveTechnician($vehicle, $mappings, $matcher);
 
             $linked[$i]                   = $user_id;
             $vehicle['user_id']           = $can_assign ? $user_id : null;
@@ -216,6 +233,8 @@ final class MapController extends AbstractController
             'with_events'   => $with_events,
             'title_source'  => $config['popup_title_source'] === 'technician' ? 'technician' : 'vehicle',
             'show_registration' => (bool) $config['popup_show_registration'],
+            // Effective state of the unlinked vehicles toggle
+            'show_unlinked' => $show_unlinked,
             // User's "due date" warning color, reused for the in-progress
             // badge (the technician is already busy)
             'warning_color' => is_string($_SESSION['glpiduedatewarning_color'] ?? null) ? $_SESSION['glpiduedatewarning_color'] : '#f39f5a',
@@ -281,6 +300,20 @@ final class MapController extends AbstractController
             'already'   => $already,
             'user_name' => $user->getFriendlyName(),
         ]);
+    }
+
+    /**
+     * GLPI user linked to a vehicle: explicit association first, optional
+     * name matching (vehicle name, then driver name) as fallback.
+     *
+     * @param Vehicle            $vehicle
+     * @param array<string, int> $mappings asset id => users_id
+     */
+    private function resolveTechnician(array $vehicle, array $mappings, ?TechnicianMatcher $matcher): ?int
+    {
+        return $mappings[$vehicle['id']]
+            ?? $matcher?->match($vehicle['label'])
+            ?? $matcher?->match($vehicle['driver_name']);
     }
 
     /**

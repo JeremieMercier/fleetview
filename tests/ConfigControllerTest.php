@@ -53,11 +53,12 @@ final class ConfigControllerTest extends DbTestCase
         $this->login('glpi');
 
         $request = Request::create('', 'POST', [
-            '_tab'          => '1',
-            'api_username'  => 'fake_api_user',
-            'search_radius' => '125',
-            'unknown_key'   => 'must-not-be-stored',
-            'update'        => '1',
+            '_tab'                => '1',
+            'api_username'        => 'fake_api_user',
+            'search_radius'       => '125',
+            'modal_show_unlinked' => '1',
+            'unknown_key'         => 'must-not-be-stored',
+            'update'              => '1',
         ]);
 
         $response = (new ConfigController())->saveConfig($request);
@@ -66,6 +67,7 @@ final class ConfigControllerTest extends DbTestCase
         $stored = Config::getConfigurationValues(PluginConfig::CONTEXT);
         $this->assertSame('fake_api_user', $stored['api_username']);
         $this->assertSame('125', $stored['search_radius']);
+        $this->assertSame('1', $stored['modal_show_unlinked']);
         $this->assertArrayNotHasKey('unknown_key', $stored);
         $this->assertArrayNotHasKey('update', $stored);
     }

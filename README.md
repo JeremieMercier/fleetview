@@ -126,9 +126,15 @@ base via GLPIKey (hook `secured_configs`) et n'apparaît jamais dans le dépôt.
 Onglet *Affichage* : couleurs des marqueurs, filtres, titre de la bulle (nom
 du technicien GLPI associé ou nom du véhicule Masternaut), affichage de la
 plaque d'immatriculation, tracé des itinéraires, nombre d'entrées du planning
-listées dans la bulle (`0` masque la section) et prise en compte des
+listées dans la bulle (`0` masque la section), prise en compte des
 événements externes (activée par défaut ; les événements récurrents ne sont
-pas développés).
+pas développés) et affichage des véhicules sans technicien associé.
+
+La carte propose un interrupteur « Véhicules sans technicien » : désactivé
+(valeur par défaut configurable), seuls les véhicules associés à un
+technicien GLPI (association explicite ou correspondance par nom) sont
+affichés ; le filtre s'applique avant le classement des plus proches et la
+limite du nombre de véhicules.
 
 L'API « Live Position Latest » est limitée à 1 requête / 15 s : les positions
 sont mises en cache côté serveur (cache GLPI, durée configurable, minimum

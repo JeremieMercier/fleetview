@@ -151,6 +151,15 @@
             ) }}
 
             {{ fields.sliderField(
+                'modal_show_unlinked',
+                config['modal_show_unlinked'],
+                __('Show vehicles without a linked technician', 'fleetview'),
+                {
+                    'helper': __('Default state of the modal toggle. Unlinked vehicles cannot be assigned to the ticket; hiding them keeps the closest technicians in the top 3.', 'fleetview'),
+                }
+            ) }}
+
+            {{ fields.sliderField(
                 'name_matching_fallback',
                 config['name_matching_fallback'],
                 __('Match technicians by name when a vehicle has no association', 'fleetview'),

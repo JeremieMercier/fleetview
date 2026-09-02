@@ -120,6 +120,11 @@ final class PluginConfig extends CommonGLPI
             // Draw the road route of the 3 closest vehicles (needs the
             // routing service; one extra request per route)
             'map_show_routes' => '1',
+            // Default state of the modal toggle showing the vehicles that
+            // are not linked to a GLPI technician (explicit association or
+            // name matching). Off by default: the map is meant to pick a
+            // technician, unlinked vehicles cannot be assigned.
+            'modal_show_unlinked' => '0',
         ];
     }
 

@@ -93,6 +93,14 @@ msgid "No vehicle found within a radius of %s km."
 msgstr ""
 
 #: public/js/fleetview.js
+msgid "No vehicle linked to a technician found within a radius of %s km."
+msgstr ""
+
+#: public/js/fleetview.js
+msgid "Vehicles without a technician"
+msgstr ""
+
+#: public/js/fleetview.js
 msgid "Unable to fetch vehicle positions."
 msgstr ""
 
@@ -374,6 +382,14 @@ msgstr ""
 
 #: templates/config_display.html.twig
 msgid "Draw the road route of the 3 closest vehicles"
+msgstr ""
+
+#: templates/config_display.html.twig
+msgid "Show vehicles without a linked technician"
+msgstr ""
+
+#: templates/config_display.html.twig
+msgid "Default state of the modal toggle. Unlinked vehicles cannot be assigned to the ticket; hiding them keeps the closest technicians in the top 3."
 msgstr ""
 
 #: templates/config_display.html.twig
