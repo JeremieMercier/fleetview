@@ -87,6 +87,12 @@
                                     ${__('Search radius (km)', 'fleetview')}
                                 </label>
                                 <select id="fleetview-radius" class="form-select form-select-sm w-auto"></select>
+                                <div class="form-check form-switch mb-0 ms-3">
+                                    <input type="checkbox" class="form-check-input" id="fleetview-show-unlinked">
+                                    <label class="form-check-label" for="fleetview-show-unlinked">
+                                        ${__('Vehicles without a technician', 'fleetview')}
+                                    </label>
+                                </div>
                                 <span id="fleetview-legend" class="ms-2"></span>
                                 <span id="fleetview-count" class="text-secondary ms-auto"></span>
                             </div>
@@ -99,11 +105,18 @@
         `;
         document.body.appendChild(wrapper.firstElementChild);
 
-        document.getElementById('fleetview-radius').addEventListener('change', (event) => {
+        // Both controls reload the vehicles with the current state of the
+        // other one (the server applies the configured defaults otherwise)
+        const reload = () => {
             if (currentTicketId !== null) {
-                loadVehicles(currentTicketId, currentContext, Number(event.target.value));
+                loadVehicles(currentTicketId, currentContext, {
+                    radius: Number(document.getElementById('fleetview-radius').value),
+                    showUnlinked: document.getElementById('fleetview-show-unlinked').checked,
+                });
             }
-        });
+        };
+        document.getElementById('fleetview-radius').addEventListener('change', reload);
+        document.getElementById('fleetview-show-unlinked').addEventListener('change', reload);
 
         // Assign buttons live inside Leaflet popups (dynamic DOM): delegate
         document.getElementById('fleetview-modal').addEventListener('click', (event) => {
@@ -376,7 +389,11 @@
         await loadVehicles(ticketId, context);
     };
 
-    const loadVehicles = async (ticketId, context, radius = null) => {
+    const syncUnlinkedToggle = (showUnlinked) => {
+        document.getElementById('fleetview-show-unlinked').checked = Boolean(showUnlinked);
+    };
+
+    const loadVehicles = async (ticketId, context, { radius = null, showUnlinked = null } = {}) => {
         const { latitude, longitude } = context.location;
         const count = document.getElementById('fleetview-count');
 
@@ -390,6 +407,9 @@
             if (radius !== null) {
                 url.searchParams.set('radius', radius);
             }
+            if (showUnlinked !== null) {
+                url.searchParams.set('show_unlinked', showUnlinked ? '1' : '0');
+            }
             const response = await fetch(url);
             const data = await response.json();
 
@@ -400,17 +420,17 @@
             }
 
             syncRadiusSelect(data.radius_km);
+            syncUnlinkedToggle(data.show_unlinked);
             updateLegend(data.marker_colors);
 
             const located = data.vehicles.filter((v) => v.latitude !== null && v.longitude !== null);
             count.textContent = _n('%1 vehicle', '%1 vehicles', located.length, 'fleetview', located.length);
 
             if (located.length === 0) {
-                showAlert(
-                    __('No vehicle found within a radius of %s km.', 'fleetview')
-                        .replace('%s', data.radius_km),
-                    'info'
-                );
+                const message = data.show_unlinked
+                    ? __('No vehicle found within a radius of %s km.', 'fleetview')
+                    : __('No vehicle linked to a technician found within a radius of %s km.', 'fleetview');
+                showAlert(message.replace('%s', data.radius_km), 'info');
                 return;
             }
 

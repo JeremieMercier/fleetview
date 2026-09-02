@@ -284,6 +284,9 @@ final class MapControllerTest extends DbTestCase
             'routing_base_url' => 'https://osrm.example.test/' . uniqid(),
             // Routes need one extra mocked response per vehicle: opt-in
             'map_show_routes'  => '0',
+            // The fixtures mix linked and unlinked vehicles: show them all,
+            // the unlinked vehicles filter has its own tests
+            'modal_show_unlinked' => '1',
         ], $overrides));
     }
 
@@ -408,6 +411,102 @@ final class MapControllerTest extends DbTestCase
 
         $by_id = array_column($payload['vehicles'], 'user_id', 'id');
         $this->assertSame($technician_id, $by_id['201']);
+    }
+
+    public function testTicketVehiclesHidesUnlinkedVehiclesWhenConfigured(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi(['modal_show_unlinked' => '0']);
+        $ticket = $this->createTicket($this->createGeoLocation()->getID());
+        VehicleMapping::save('202', 'Martin Sophie', 4242);
+
+        // Only the linked vehicle reaches the routing service
+        $controller = $this->mockedController(null, [
+            new Response(200, [], json_encode([
+                'code'      => 'Ok',
+                'durations' => [[0, 600]],
+                'distances' => [[0, 9500]],
+            ])),
+        ]);
+        $payload = $this->payload($controller->ticketVehicles(Request::create(''), $ticket->getID()));
+
+        $this->assertFalse($payload['show_unlinked']);
+        $this->assertSame(['202'], array_column($payload['vehicles'], 'id'));
+        $this->assertSame(10, $payload['vehicles'][0]['travel_time_min']);
+    }
+
+    public function testTicketVehiclesShowsUnlinkedVehiclesWhenConfigured(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi(['modal_show_unlinked' => '1']);
+        $ticket = $this->createTicket($this->createGeoLocation()->getID());
+        VehicleMapping::save('202', 'Martin Sophie', 4242);
+
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+
+        $this->assertTrue($payload['show_unlinked']);
+        $this->assertSame(['202', '201'], array_column($payload['vehicles'], 'id'));
+    }
+
+    public function testTicketVehiclesHonoursTheUnlinkedVehiclesToggle(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi(['modal_show_unlinked' => '0']);
+        $ticket = $this->createTicket($this->createGeoLocation()->getID());
+        VehicleMapping::save('202', 'Martin Sophie', 4242);
+
+        // The modal toggle overrides the configured default, both ways
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create('', 'GET', ['show_unlinked' => '1']), $ticket->getID()));
+        $this->assertTrue($payload['show_unlinked']);
+        $this->assertSame(['202', '201'], array_column($payload['vehicles'], 'id'));
+
+        $one_route = [new Response(200, [], json_encode(['code' => 'Ok', 'durations' => [[0, 600]], 'distances' => [[0, 9500]]]))];
+        $this->configurePluginApi(['modal_show_unlinked' => '1']);
+        $payload = $this->payload($this->mockedController(null, $one_route)->ticketVehicles(Request::create('', 'GET', ['show_unlinked' => '0']), $ticket->getID()));
+        $this->assertFalse($payload['show_unlinked']);
+        $this->assertSame(['202'], array_column($payload['vehicles'], 'id'));
+
+        // Anything else falls back on the configuration
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create('', 'GET', ['show_unlinked' => 'yes']), $ticket->getID()));
+        $this->assertTrue($payload['show_unlinked']);
+        $this->assertCount(2, $payload['vehicles']);
+    }
+
+    public function testTicketVehiclesCountsNameMatchedVehiclesAsLinked(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi(['modal_show_unlinked' => '0', 'name_matching_fallback' => '1']);
+        $ticket = $this->createTicket($this->createGeoLocation()->getID());
+
+        $technician = new User();
+        $technician_id = $technician->add([
+            'name'      => 'fake_tech_' . uniqid(),
+            'firstname' => 'Jean',
+            'realname'  => 'Dupont',
+            'is_active' => 1,
+        ]);
+        $this->assertGreaterThan(0, $technician_id);
+
+        $one_route = [new Response(200, [], json_encode(['code' => 'Ok', 'durations' => [[0, 1800]], 'distances' => [[0, 12000]]]))];
+        $payload = $this->payload($this->mockedController(null, $one_route)->ticketVehicles(Request::create(''), $ticket->getID()));
+
+        $this->assertSame(['201'], array_column($payload['vehicles'], 'id'));
+        $this->assertSame($technician_id, $payload['vehicles'][0]['user_id']);
+    }
+
+    public function testTicketVehiclesFiltersUnlinkedVehiclesBeforeTheResultsLimit(): void
+    {
+        $this->login('glpi');
+        // 201 is the closest as the crow flies: with one result only, it
+        // would be the one kept without the filter
+        $this->configurePluginApi(['modal_show_unlinked' => '0', 'max_results' => '1']);
+        $ticket = $this->createTicket($this->createGeoLocation()->getID());
+        VehicleMapping::save('202', 'Martin Sophie', 4242);
+
+        $one_route = [new Response(200, [], json_encode(['code' => 'Ok', 'durations' => [[0, 600]], 'distances' => [[0, 9500]]]))];
+        $payload = $this->payload($this->mockedController(null, $one_route)->ticketVehicles(Request::create(''), $ticket->getID()));
+
+        $this->assertSame(['202'], array_column($payload['vehicles'], 'id'));
     }
 
     public function testTicketVehiclesClampsTheRadiusOverride(): void

@@ -97,6 +97,14 @@ msgid "No vehicle found within a radius of %s km."
 msgstr "No vehicle found within a radius of %s km."
 
 #: public/js/fleetview.js
+msgid "No vehicle linked to a technician found within a radius of %s km."
+msgstr "No vehicle linked to a technician found within a radius of %s km."
+
+#: public/js/fleetview.js
+msgid "Vehicles without a technician"
+msgstr "Vehicles without a technician"
+
+#: public/js/fleetview.js
 msgid "Unable to fetch vehicle positions."
 msgstr "Unable to fetch vehicle positions."
 
@@ -401,6 +409,14 @@ msgstr "%1 is already assigned to this ticket."
 #: templates/config_display.html.twig
 msgid "Draw the road route of the 3 closest vehicles"
 msgstr "Draw the road route of the 3 closest vehicles"
+
+#: templates/config_display.html.twig
+msgid "Show vehicles without a linked technician"
+msgstr "Show vehicles without a linked technician"
+
+#: templates/config_display.html.twig
+msgid "Default state of the modal toggle. Unlinked vehicles cannot be assigned to the ticket; hiding them keeps the closest technicians in the top 3."
+msgstr "Default state of the modal toggle. Unlinked vehicles cannot be assigned to the ticket; hiding them keeps the closest technicians in the top 3."
 
 #: templates/config_display.html.twig
 msgid "Requires the routing service. Routes use the marker colors above; one extra routing request per vehicle."

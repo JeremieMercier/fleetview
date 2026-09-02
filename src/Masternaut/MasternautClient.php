@@ -33,6 +33,7 @@
 
 namespace GlpiPlugin\Fleetview\Masternaut;
 
+use Closure;
 use GlpiPlugin\Fleetview\PluginConfig;
 use GuzzleHttp\ClientInterface;
 use GuzzleHttp\Exception\GuzzleException;
@@ -51,6 +52,19 @@ use function Safe\json_decode;
  * - HTTP Basic authentication (Connect Partner user)
  * - "Live Position Latest" is rate-limited to 1 request / 15 seconds, hence
  *   the mandatory server-side cache on positions.
+ *
+ * @phpstan-type Vehicle array{
+ *      id: string,
+ *      label: string,
+ *      registration: string,
+ *      distance_km: float,
+ *      latitude: float,
+ *      longitude: float,
+ *      driver_name: ?string,
+ *      updated_at: ?string,
+ *      event_type: ?string,
+ *      status: ?string,
+ * }
  */
 final class MasternautClient
 {
@@ -91,22 +105,15 @@ final class MasternautClient
      * would hide parked technicians (weekends, leaves...). This also saves
      * an API call, as positions are cached.
      *
-     * @return list<array{
-     *      id: string,
-     *      label: string,
-     *      registration: string,
-     *      distance_km: float,
-     *      latitude: float,
-     *      longitude: float,
-     *      driver_name: ?string,
-     *      updated_at: ?string,
-     *      event_type: ?string,
-     *      status: ?string,
-     * }>
+     * @param ?Closure(Vehicle): bool $keep Optional filter on the
+     *        built vehicle entries, applied before the closest ones are kept
+     *        (so `max_results` still counts the displayed vehicles)
+     *
+     * @return list<Vehicle>
      *
      * @throws MasternautApiException
      */
-    public function getNearbyVehicles(float $latitude, float $longitude): array
+    public function getNearbyVehicles(float $latitude, float $longitude, ?Closure $keep = null): array
     {
         $radius = min(500.0, max(1.0, (float) $this->config['search_radius']));
         $max    = max(1, (int) $this->config['max_results']);
@@ -142,7 +149,7 @@ final class MasternautClient
             $name         = $this->toString($item['assetName'] ?? null);
             $registration = $this->toString($item['assetRegistration'] ?? null);
 
-            $vehicles[] = [
+            $vehicle = [
                 'id'           => $this->toString($item['assetId'] ?? null),
                 'label'        => $name !== '' ? $name : $registration,
                 'registration' => $registration,
@@ -154,6 +161,12 @@ final class MasternautClient
                 'event_type'   => $this->toStringOrNull($item['eventType'] ?? null),
                 'status'       => $info['status'] ?? null,
             ];
+
+            if ($keep !== null && !$keep($vehicle)) {
+                continue;
+            }
+
+            $vehicles[] = $vehicle;
         }
 
         usort($vehicles, static fn(array $a, array $b) => $a['distance_km'] <=> $b['distance_km']);
