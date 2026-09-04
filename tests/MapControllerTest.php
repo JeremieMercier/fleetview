@@ -52,6 +52,8 @@ use Group;
 use Group_User;
 use Location;
 use Planning;
+use Profile as CoreProfile;
+use Profile_User;
 use PlanningEventCategory;
 use PlanningExternalEvent;
 use Session;
@@ -203,19 +205,54 @@ final class MapControllerTest extends DbTestCase
         $this->assertSame([], $payload['vehicles']);
     }
 
-    public function testAssignTechnicianAddsTheActorOnce(): void
+    /**
+     * Active user holding the given profile in an entity, linked to a fleet
+     * vehicle when an asset id is given.
+     */
+    private function createTechnician(string $profile_name, int $entities_id, bool $is_recursive, ?string $asset_id = null, array $extra = []): int
     {
-        $this->login('glpi');
-        $ticket = $this->createTicket();
-
-        $technician = new User();
-        $technician_id = $technician->add([
+        $user     = new User();
+        $users_id = $user->add($extra + [
             'name'      => 'fake_tech_' . uniqid(),
             'firstname' => 'Jean',
             'realname'  => 'Dupont',
             'is_active' => 1,
         ]);
-        $this->assertGreaterThan(0, $technician_id);
+        $this->assertGreaterThan(0, $users_id);
+
+        if ($profile_name !== '') {
+            $profile_user = new Profile_User();
+            $this->assertGreaterThan(0, $profile_user->add([
+                'users_id'     => $users_id,
+                'profiles_id'  => getItemByTypeName(CoreProfile::class, $profile_name, true),
+                'entities_id'  => $entities_id,
+                'is_recursive' => $is_recursive ? 1 : 0,
+            ]));
+        }
+
+        if ($asset_id !== null) {
+            VehicleMapping::save($asset_id, 'Vehicle ' . $asset_id, $users_id);
+        }
+
+        return $users_id;
+    }
+
+    private function countAssignees(Ticket $ticket, int $users_id): int
+    {
+        return countElementsInTable(Ticket_User::getTable(), [
+            'tickets_id' => $ticket->getID(),
+            'users_id'   => $users_id,
+            'type'       => CommonITILActor::ASSIGN,
+        ]);
+    }
+
+    public function testAssignTechnicianAddsTheActorOnce(): void
+    {
+        $this->login('glpi');
+        $ticket = $this->createTicket();
+
+        // Linked to a vehicle, technician of the root entity tree
+        $technician_id = $this->createTechnician('Technician', $this->rootEntityId(), true, '201');
 
         $request = Request::create('', 'POST', content: json_encode(['users_id' => $technician_id]));
 
@@ -258,6 +295,77 @@ final class MapControllerTest extends DbTestCase
         // Unparsable payload
         $request = Request::create('', 'POST', content: 'not json');
         $this->assertSame(400, (new MapController())->assignTechnician($request, $ticket->getID())->getStatusCode());
+    }
+
+    public function testAssignTechnicianOnlyAcceptsTheTechniciansOfferedByTheMap(): void
+    {
+        $this->login('glpi');
+        $root   = $this->rootEntityId();
+        $ticket = $this->createTicket();
+
+        $entity = new Entity();
+        $sub    = $entity->add(['name' => 'Fleetview sub ' . uniqid(), 'entities_id' => $root]);
+        $this->assertGreaterThan(0, $sub);
+
+        $rejected = [
+            // Active technician, not linked to any vehicle
+            'unlinked'         => $this->createTechnician('Technician', $root, true),
+            // Linked, but no profile at all (service account)
+            'no profile'       => $this->createTechnician('', $root, true, '211'),
+            // Linked, but the profile may not take tickets
+            'requester'        => $this->createTechnician('Self-Service', $root, true, '212'),
+            // Linked technician of another entity (unrelated to the ticket)
+            'other entity'     => $this->createTechnician('Technician', $sub, false, '213'),
+            // Linked technician of the root entity without recursion:
+            // unrelated to a ticket of a sub-entity (checked below)
+        ];
+
+        foreach ($rejected as $case => $users_id) {
+            $request  = Request::create('', 'POST', content: json_encode(['users_id' => $users_id]));
+            $response = (new MapController())->assignTechnician($request, $ticket->getID());
+            $this->assertSame(403, $response->getStatusCode(), $case);
+            $this->assertSame(0, $this->countAssignees($ticket, $users_id), $case);
+        }
+
+        // Linked technician whose rights cover the ticket entity: accepted
+        $accepted = $this->createTechnician('Technician', $root, true, '214');
+        $request  = Request::create('', 'POST', content: json_encode(['users_id' => $accepted]));
+        $this->assertSame(200, (new MapController())->assignTechnician($request, $ticket->getID())->getStatusCode());
+        $this->assertSame(1, $this->countAssignees($ticket, $accepted));
+
+        // Ticket of the sub-entity: the recursive technician is accepted,
+        // the root-only one is not
+        $sub_ticket = new Ticket();
+        $this->assertGreaterThan(0, $sub_ticket->add([
+            'name'        => 'Ticket test fictif',
+            'content'     => 'Contenu de test fictif',
+            'entities_id' => $sub,
+        ]));
+        $root_only = $this->createTechnician('Technician', $root, false, '215');
+        $request   = Request::create('', 'POST', content: json_encode(['users_id' => $root_only]));
+        $this->assertSame(403, (new MapController())->assignTechnician($request, $sub_ticket->getID())->getStatusCode());
+        $request   = Request::create('', 'POST', content: json_encode(['users_id' => $accepted]));
+        $this->assertSame(200, (new MapController())->assignTechnician($request, $sub_ticket->getID())->getStatusCode());
+    }
+
+    public function testAssignTechnicianAcceptsNameMatchedTechniciansWhenEnabled(): void
+    {
+        $this->login('glpi');
+        $ticket = $this->createTicket($this->createGeoLocation()->getID());
+
+        // Named after the fictional vehicle "Dupont Jean" (asset 201), not
+        // explicitly linked; a technician of the root entity tree
+        $matched = $this->createTechnician('Technician', $this->rootEntityId(), true);
+        $request = Request::create('', 'POST', content: json_encode(['users_id' => $matched]));
+
+        // Name matching disabled: not offered by the map, rejected
+        $this->configurePluginApi(['name_matching_fallback' => '0']);
+        $this->assertSame(403, $this->mockedController()->assignTechnician($request, $ticket->getID())->getStatusCode());
+
+        // Enabled: the vehicle is near the ticket, the technician is offered
+        $this->configurePluginApi(['name_matching_fallback' => '1']);
+        $this->assertSame(200, $this->mockedController()->assignTechnician($request, $ticket->getID())->getStatusCode());
+        $this->assertSame(1, $this->countAssignees($ticket, $matched));
     }
 
     public function testAssignTechnicianRequiresTheAssignRight(): void

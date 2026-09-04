@@ -30,6 +30,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- The assignment from the map only accepts the technicians the map may
+  offer for the ticket (linked to a vehicle, holding the "own ticket" right
+  in the ticket entity, as the native actor dropdown requires): the assignee
+  was taken from the request and only checked as an existing active user,
+  so any active account (another entity, a service account...) could be
+  assigned and notified (marketplace security review of 0.5.0,
+  [#12](https://github.com/JeremieMercier/fleetview/issues/12)).
 - The planned tasks of the marker popup follow the ticket read rights of the
   user (see all / see group / see mine / see assigned...), as the GLPI
   planning does, and need a task right: a profile allowed to see all

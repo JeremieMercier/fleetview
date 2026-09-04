@@ -205,6 +205,10 @@ msgstr "Ticket introuvable"
 msgid "User not found"
 msgstr "Utilisateur introuvable"
 
+#: src/Controller/MapController.php
+msgid "This technician cannot be assigned from the map."
+msgstr "Ce technicien ne peut pas être attribué depuis la carte."
+
 #: templates/config.html.twig
 msgid "Match technicians by name when a vehicle has no association"
 msgstr "Faire correspondre les techniciens par nom quand un véhicule n'a pas d'association"

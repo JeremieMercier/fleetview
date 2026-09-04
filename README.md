@@ -157,7 +157,11 @@ après l'installation et retirez le droit aux profils qui n'ont pas à voir
 la flotte, par exemple observateur s'il est réservé à des managers ou des
 auditeurs ; les personnalisations sont conservées à la mise à jour. Un
 profil créé après l'installation n'a pas le droit. L'attribution depuis la
-carte requiert en plus le droit d'attribuer les tickets.
+carte requiert en plus le droit d'attribuer les tickets, et n'accepte que
+les techniciens que la carte propose pour ce ticket : associés à un
+véhicule (association explicite ou correspondance par nom) et habilités à
+prendre des tickets dans l'entité du ticket, comme la liste déroulante
+native des acteurs.
 
 Le planning listé dans la bulle (tâches planifiées et événements externes)
 suit le droit GLPI *Planning* du profil (onglet *Assistance*) : « voir tous

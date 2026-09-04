@@ -45,6 +45,7 @@ use GlpiPlugin\Fleetview\TechnicianAgenda;
 use GlpiPlugin\Fleetview\TechnicianMatcher;
 use GlpiPlugin\Fleetview\VehicleMapping;
 use Location;
+use Profile_User;
 use Safe\Exceptions\JsonException;
 use Ticket_User;
 use User;
@@ -302,6 +303,17 @@ final class MapController extends AbstractController
             return new JsonResponse(['error' => __('User not found', 'fleetview')], Response::HTTP_BAD_REQUEST);
         }
 
+        // The assignee is not taken on trust from the request: it must be
+        // one of the technicians the map may offer for this ticket, and be
+        // allowed to take tickets in its entity, as the native actor
+        // dropdown requires ("own ticket" right, entity restricted).
+        if (!in_array($users_id, $this->getAssignableTechnicians($ticket), true)) {
+            return new JsonResponse(
+                ['error' => __('This technician cannot be assigned from the map.', 'fleetview')],
+                Response::HTTP_FORBIDDEN,
+            );
+        }
+
         $ticket_user = new Ticket_User();
         $already = $ticket_user->getFromDBByCrit([
             'tickets_id' => $id,
@@ -340,6 +352,56 @@ final class MapController extends AbstractController
             ['error' => __('You are not allowed to view the fleet map.', 'fleetview')],
             Response::HTTP_FORBIDDEN,
         );
+    }
+
+    /**
+     * Technicians the map may offer for the ticket: users linked to a fleet
+     * vehicle (explicit association, or name matching of the vehicles the
+     * map can display around the ticket when the fallback is enabled),
+     * restricted to those holding the "own ticket" right in the ticket
+     * entity. The eligibility of the assignee is decided here, server-side.
+     *
+     * @return list<int>
+     */
+    private function getAssignableTechnicians(Ticket $ticket): array
+    {
+        $config     = PluginConfig::getConfig();
+        $mappings   = VehicleMapping::getMap();
+        $candidates = array_values(array_unique(array_values($mappings)));
+
+        $location = $this->getTicketLocation($ticket);
+        if ($config['name_matching_fallback'] && $location !== null) {
+            // Widest search the modal allows, so that every vehicle it may
+            // have displayed is considered (positions are cached)
+            $config['search_radius'] = $config['search_radius_max'];
+            $client = $this->buildMasternautClient($config);
+            if ($client->isConfigured()) {
+                $matcher = new TechnicianMatcher();
+                try {
+                    foreach ($client->getNearbyVehicles($location['latitude'], $location['longitude']) as $vehicle) {
+                        $users_id = $this->resolveTechnician($vehicle, $mappings, $matcher);
+                        if ($users_id !== null) {
+                            $candidates[] = $users_id;
+                        }
+                    }
+                } catch (MasternautApiException) {
+                    // No name-matched candidate when the fleet is unreachable
+                }
+            }
+        }
+
+        $entities_id = $ticket->getEntityID();
+        $assignable  = [];
+        foreach (array_unique($candidates) as $users_id) {
+            foreach (Profile_User::getUserEntitiesForRight($users_id, Ticket::$rightname, Ticket::OWN) as $entity) {
+                if (is_numeric($entity) && (int) $entity === $entities_id) {
+                    $assignable[] = $users_id;
+                    break;
+                }
+            }
+        }
+
+        return $assignable;
     }
 
     /**

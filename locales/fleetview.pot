@@ -202,6 +202,10 @@ msgstr ""
 msgid "User not found"
 msgstr ""
 
+#: src/Controller/MapController.php
+msgid "This technician cannot be assigned from the map."
+msgstr ""
+
 #: templates/config.html.twig
 msgid "Match technicians by name when a vehicle has no association"
 msgstr ""
