@@ -222,8 +222,16 @@ msgstr ""
 msgid "Configure and save the API access in the API tab to list the fleet vehicles."
 msgstr ""
 
-#: templates/config.html.twig
-msgid "Associate each Masternaut vehicle with a GLPI user. Rows marked \"suggestion\" are pre-filled from name matching: save to confirm them."
+#: templates/config_mappings.html.twig
+msgid "Associate each Masternaut vehicle with a GLPI user. A suggestion comes from name matching and is not applied by itself: click it to fill the user, then save."
+msgstr ""
+
+#: templates/config_mappings.html.twig
+msgid "Fill the user with this suggestion"
+msgstr ""
+
+#: templates/config_mappings.html.twig
+msgid "Suggestion: %s"
 msgstr ""
 
 #: templates/config_mappings.html.twig
@@ -236,10 +244,6 @@ msgstr ""
 
 #: templates/config.html.twig
 msgid "Registration"
-msgstr ""
-
-#: templates/config.html.twig
-msgid "suggestion"
 msgstr ""
 
 #: src/Controller/MappingController.php

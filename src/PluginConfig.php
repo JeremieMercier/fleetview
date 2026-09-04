@@ -401,12 +401,16 @@ final class PluginConfig extends CommonGLPI
                 $mappings = VehicleMapping::getAll();
                 $matcher  = new TechnicianMatcher();
                 foreach ($client->getVehicles() as $vehicle) {
-                    $mapping  = $mappings[$vehicle['id']] ?? null;
-                    $users_id = $mapping['users_id'] ?? 0;
+                    $mapping      = $mappings[$vehicle['id']] ?? null;
+                    $users_id     = $mapping['users_id'] ?? 0;
+                    // Name-matching suggestion, only offered: it is never
+                    // saved unless the administrator applies it explicitly
+                    $suggested_id = $users_id === 0 ? ($matcher->match($vehicle['name']) ?? 0) : 0;
                     $vehicle['status_label'] = self::getStatusLabel($vehicle['status']);
                     $vehicles[] = $vehicle + [
-                        'users_id'     => $users_id,
-                        'suggested_id' => $users_id === 0 ? ($matcher->match($vehicle['name']) ?? 0) : 0,
+                        'users_id'       => $users_id,
+                        'suggested_id'   => $suggested_id,
+                        'suggested_name' => $suggested_id > 0 ? getUserName($suggested_id) : '',
                         'entities_id'  => $mapping['entities_id'] ?? Session::getActiveEntity(),
                         'is_recursive' => $mapping['is_recursive'] ?? true,
                     ];

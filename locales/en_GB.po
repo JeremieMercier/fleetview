@@ -214,13 +214,17 @@ msgstr "This technician cannot be assigned from the map."
 msgid "Match technicians by name when a vehicle has no association"
 msgstr "Match technicians by name when a vehicle has no association"
 
-#: templates/config.html.twig
-msgid ""
-"Only useful when vehicles are named after their technician. Explicit "
-"associations always take precedence."
-msgstr ""
-"Only useful when vehicles are named after their technician. Explicit "
-"associations always take precedence."
+#: templates/config_mappings.html.twig
+msgid "Associate each Masternaut vehicle with a GLPI user. A suggestion comes from name matching and is not applied by itself: click it to fill the user, then save."
+msgstr "Associate each Masternaut vehicle with a GLPI user. A suggestion comes from name matching and is not applied by itself: click it to fill the user, then save."
+
+#: templates/config_mappings.html.twig
+msgid "Fill the user with this suggestion"
+msgstr "Fill the user with this suggestion"
+
+#: templates/config_mappings.html.twig
+msgid "Suggestion: %s"
+msgstr "Suggestion: %s"
 
 #: templates/config.html.twig
 msgid "Vehicle to technician associations"
@@ -251,10 +255,6 @@ msgstr "Vehicle"
 #: templates/config.html.twig
 msgid "Registration"
 msgstr "Registration"
-
-#: templates/config.html.twig
-msgid "suggestion"
-msgstr "suggestion"
 
 #: src/Controller/MappingController.php
 msgid "Vehicle associations have been saved."

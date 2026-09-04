@@ -225,9 +225,17 @@ msgstr "Associations véhicules / techniciens"
 msgid "Configure and save the API access in the API tab to list the fleet vehicles."
 msgstr "Configurez et enregistrez l'accès API dans l'onglet API pour lister les véhicules de la flotte."
 
-#: templates/config.html.twig
-msgid "Associate each Masternaut vehicle with a GLPI user. Rows marked \"suggestion\" are pre-filled from name matching: save to confirm them."
-msgstr "Associez chaque véhicule Masternaut à un utilisateur GLPI. Les lignes marquées « suggestion » sont préremplies par correspondance de nom : enregistrez pour les confirmer."
+#: templates/config_mappings.html.twig
+msgid "Associate each Masternaut vehicle with a GLPI user. A suggestion comes from name matching and is not applied by itself: click it to fill the user, then save."
+msgstr "Associez chaque véhicule Masternaut à un utilisateur GLPI. Une suggestion provient de la correspondance par nom et ne s'applique pas d'elle-même : cliquez dessus pour remplir l'utilisateur, puis enregistrez."
+
+#: templates/config_mappings.html.twig
+msgid "Fill the user with this suggestion"
+msgstr "Remplir l'utilisateur avec cette suggestion"
+
+#: templates/config_mappings.html.twig
+msgid "Suggestion: %s"
+msgstr "Suggestion : %s"
 
 #: templates/config_mappings.html.twig
 msgid "An association only applies to the tickets of its entity (and of its child entities when enabled): on other tickets, the vehicle appears as not linked, without the technician name."
@@ -240,10 +248,6 @@ msgstr "Véhicule"
 #: templates/config.html.twig
 msgid "Registration"
 msgstr "Immatriculation"
-
-#: templates/config.html.twig
-msgid "suggestion"
-msgstr "suggestion"
 
 #: src/Controller/MappingController.php
 msgid "Vehicle associations have been saved."

@@ -49,7 +49,7 @@
                 </div>
             {% else %}
                 <p class="text-secondary">
-                    {{ __('Associate each Masternaut vehicle with a GLPI user. Rows marked "suggestion" are pre-filled from name matching: save to confirm them.', 'fleetview') }}
+                    {{ __('Associate each Masternaut vehicle with a GLPI user. A suggestion comes from name matching and is not applied by itself: click it to fill the user, then save.', 'fleetview') }}
                     {{ __('An association only applies to the tickets of its entity (and of its child entities when enabled): on other tickets, the vehicle appears as not linked, without the technician name.', 'fleetview') }}
                 </p>
                 <div class="table-responsive">
@@ -116,13 +116,18 @@
                                         <input type="hidden" name="labels[{{ vehicle.id }}]" value="{{ vehicle.name }}" />
                                         {% do call('User::dropdown', [{
                                             'name': 'mappings[' ~ vehicle.id ~ ']',
-                                            'value': vehicle.users_id > 0 ? vehicle.users_id : vehicle.suggested_id,
+                                            'value': vehicle.users_id,
                                             'right': 'all',
                                             'entity': -1,
                                             'width': '100%',
                                         }]) %}
                                         {% if vehicle.users_id == 0 and vehicle.suggested_id > 0 %}
-                                            <span class="badge bg-yellow-lt ms-1">{{ __('suggestion', 'fleetview') }}</span>
+                                            <button type="button" class="btn btn-sm btn-outline-warning mt-1 fleetview-apply-suggestion"
+                                                    data-users-id="{{ vehicle.suggested_id }}"
+                                                    data-name="{{ vehicle.suggested_name }}"
+                                                    title="{{ __('Fill the user with this suggestion', 'fleetview') }}">
+                                                <i class="ti ti-bulb me-1"></i>{{ __('Suggestion: %s', 'fleetview')|format(vehicle.suggested_name) }}
+                                            </button>
                                         {% endif %}
                                     </td>
                                     <td>
@@ -178,6 +183,28 @@
 
                     table.querySelectorAll('[data-filter]').forEach((i) => i.addEventListener('input', applyFilters));
                     table.querySelectorAll('[data-filter-select]').forEach((s) => s.addEventListener('change', applyFilters));
+
+                    // A suggestion only fills the user dropdown when clicked
+                    // (select2 with remote data: the option is added by hand);
+                    // it is saved with the form, like any other choice
+                    tbody.addEventListener('click', (event) => {
+                        const button = event.target.closest('.fleetview-apply-suggestion');
+                        if (!button) {
+                            return;
+                        }
+                        const row    = button.closest('tr');
+                        const select = row.querySelector('select[name^="mappings["]');
+                        if (!select) {
+                            return;
+                        }
+                        if (![...select.options].some((o) => o.value === button.dataset.usersId)) {
+                            select.add(new Option(button.dataset.name, button.dataset.usersId));
+                        }
+                        $(select).val(button.dataset.usersId).trigger('change');
+                        row.dataset.state = 'mapped';
+                        button.remove();
+                        applyFilters();
+                    });
 
                     // Click on a header to sort (toggles asc/desc)
                     let sortKey = null;

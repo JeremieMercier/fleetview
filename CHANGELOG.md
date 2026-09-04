@@ -33,6 +33,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   their configured URL (marketplace security review of 0.5.0,
   [#12](https://github.com/JeremieMercier/fleetview/issues/12)).
 
+### Fixed
+
+- Name-matching suggestions of the associations tab are no longer applied
+  by themselves: the user dropdown of a suggested row stays empty and the
+  suggestion is a button filling it, so saving the tab (for other rows)
+  does not silently turn every suggestion into an association.
+
 ### Security
 
 - The GLPI identity of the vehicle technicians (association, name matching,
