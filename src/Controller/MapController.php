@@ -129,11 +129,16 @@ final class MapController extends AbstractController
 
         $config = PluginConfig::getConfig();
 
-        // Optional radius override from the modal selector
-        $radius = $request->query->get('radius');
-        if (is_numeric($radius)) {
-            $config['search_radius'] = (string) min(500, max(1, (int) $radius));
+        // Optional radius override from the modal selector, bounded by the
+        // configured maximum radius (the configured radius is the default
+        // of the selector, the maximum is the widest search allowed).
+        $max_radius = min(500, max(1, (int) $config['search_radius_max']));
+        $radius     = $request->query->get('radius');
+        if (!is_numeric($radius)) {
+            $radius = $config['search_radius'];
         }
+
+        $config['search_radius'] = (string) min($max_radius, max(1, (int) $radius));
 
         // Optional override of the unlinked vehicles toggle from the modal
         // (the configured value is its default state)
@@ -246,6 +251,7 @@ final class MapController extends AbstractController
             'configured'    => true,
             'can_assign'    => $can_assign,
             'radius_km'     => (float) $config['search_radius'],
+            'radius_max_km' => (float) $max_radius,
             'max_tasks'     => $max_tasks,
             'with_events'   => $with_events,
             'title_source'  => $config['popup_title_source'] === 'technician' ? 'technician' : 'vehicle',

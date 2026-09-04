@@ -513,15 +513,50 @@ final class MapControllerTest extends DbTestCase
         $this->assertSame(['202'], array_column($payload['vehicles'], 'id'));
     }
 
-    public function testTicketVehiclesClampsTheRadiusOverride(): void
+    public function testTicketVehiclesClampsTheRadiusOverrideToTheConfiguredMaximum(): void
     {
         $this->login('glpi');
-        $this->configurePluginApi();
+        $this->configurePluginApi(['search_radius' => '50', 'search_radius_max' => '75']);
         $ticket = $this->createTicket($this->createGeoLocation()->getID());
 
-        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create('', 'GET', ['radius' => '9999']), $ticket->getID()));
+        // No override: the configured radius
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $this->assertSame(50, (int) $payload['radius_km']);
+        $this->assertSame(75, (int) $payload['radius_max_km']);
 
-        $this->assertSame(500, (int) $payload['radius_km']);
+        // Wider than the maximum: the maximum, not the provider limit of 500 km
+        foreach (['9999', '500', '76'] as $radius) {
+            $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create('', 'GET', ['radius' => $radius]), $ticket->getID()));
+            $this->assertSame(75, (int) $payload['radius_km'], "radius=$radius");
+        }
+
+        // Within the maximum: honoured, wider than the default included
+        foreach (['25', '75'] as $radius) {
+            $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create('', 'GET', ['radius' => $radius]), $ticket->getID()));
+            $this->assertSame((int) $radius, (int) $payload['radius_km'], "radius=$radius");
+        }
+
+        // Below the minimum
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create('', 'GET', ['radius' => '0']), $ticket->getID()));
+        $this->assertSame(1, (int) $payload['radius_km']);
+    }
+
+    public function testTicketVehiclesBoundsTheDefaultRadiusByTheConfiguredMaximum(): void
+    {
+        $this->login('glpi');
+        // Inconsistent settings (default wider than the maximum, maximum
+        // above the provider limit): the maximum wins, capped at 500 km
+        $this->configurePluginApi(['search_radius' => '300', 'search_radius_max' => '9999']);
+        $ticket = $this->createTicket($this->createGeoLocation()->getID());
+
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $this->assertSame(300, (int) $payload['radius_km']);
+        $this->assertSame(500, (int) $payload['radius_max_km']);
+
+        $this->configurePluginApi(['search_radius' => '300', 'search_radius_max' => '100']);
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $this->assertSame(100, (int) $payload['radius_km']);
+        $this->assertSame(100, (int) $payload['radius_max_km']);
     }
 
     public function testTicketVehiclesReportsApiFailures(): void

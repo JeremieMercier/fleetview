@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- "Maximum search radius" setting, the upper limit of the radius selector of
+  the map (150 km by default, 500 km at most: the provider limit). The
+  existing "Search radius" setting is documented as what it always was: the
+  default value of the selector. Existing installations get the 150 km
+  limit on update: raise it in the display settings if the map users need a
+  wider search.
+
+### Security
+
+- The radius selector of the map is bounded by the new maximum radius
+  setting: the configured radius was only a default, any map user could
+  widen the search to the provider maximum of 500 km whatever the
+  administrator intended (GLPI marketplace security review of 0.5.0,
+  [#12](https://github.com/JeremieMercier/fleetview/issues/12)).
+
 ## [0.5.0] - 2026-09-02
 
 ### Added

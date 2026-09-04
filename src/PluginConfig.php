@@ -84,7 +84,8 @@ final class PluginConfig extends CommonGLPI
             'customer_id'    => '',    // Connect customer number, part of endpoint URLs
             'api_username'   => '',    // Connect Partner user (HTTP Basic auth)
             'api_secret'     => '',
-            'search_radius'  => '50',  // km around the ticket location (API max: 500)
+            'search_radius'  => '50',  // km around the ticket location, default of the map selector
+            'search_radius_max' => '150', // km, upper limit of the map selector (API max: 500)
             'max_results'    => '10',  // maximum number of vehicles returned
             'cache_lifetime' => '60',  // seconds, positions cache (API limit: 1 req/15s)
             // Restrict the vehicles shown in the map modal; empty = no filter,
@@ -288,10 +289,11 @@ final class PluginConfig extends CommonGLPI
         $config = self::getConfig();
 
         // Same radius choices as the modal selector (keep in sync with
-        // RADIUS_CHOICES in fleetview.js); the current value stays
-        // selectable even if it is not part of the presets
+        // RADIUS_CHOICES in fleetview.js); the current values stay
+        // selectable even if they are not part of the presets
         $radius_choices = [25, 50, 75, 100, 125, 150, 175, 200, 250, 300, 400, 500];
         $radius_choices[] = (int) $config['search_radius'];
+        $radius_choices[] = (int) $config['search_radius_max'];
         $radius_choices = array_unique($radius_choices);
         sort($radius_choices);
         $radius_choices = array_combine(

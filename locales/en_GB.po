@@ -71,6 +71,18 @@ msgstr "Leave empty to keep the current secret"
 msgid "Search radius (km)"
 msgstr "Search radius (km)"
 
+#: templates/config_display.html.twig
+msgid "Default value of the radius selector of the map."
+msgstr "Default value of the radius selector of the map."
+
+#: templates/config_display.html.twig
+msgid "Maximum search radius (km)"
+msgstr "Maximum search radius (km)"
+
+#: templates/config_display.html.twig
+msgid "Widest search a user can select on the map."
+msgstr "Widest search a user can select on the map."
+
 #: templates/config.html.twig
 msgid "Maximum number of vehicles displayed"
 msgstr "Maximum number of vehicles displayed"

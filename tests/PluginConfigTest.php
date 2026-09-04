@@ -47,8 +47,9 @@ final class PluginConfigTest extends TestCase
     {
         $defaults = PluginConfig::getDefaults();
 
-        // The out-of-the-box radius must be 50 km
+        // The out-of-the-box radius must be 50 km, widenable up to 150 km
         $this->assertSame('50', $defaults['search_radius']);
+        $this->assertSame('150', $defaults['search_radius_max']);
 
         // No credential is ever shipped as a default value
         $this->assertSame('', $defaults['customer_id']);

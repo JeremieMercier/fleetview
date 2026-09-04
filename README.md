@@ -120,7 +120,9 @@ php bin/console glpi:plugin:activate fleetview
 
 *Configuration → Générale → onglet Fleetview* : URL de base, numéro client
 Connect, utilisateur Partner (HTTP Basic) et secret de l'API, rayon de
-recherche, nombre de véhicules et durée du cache. Le secret est chiffré en
+recherche (valeur par défaut du sélecteur de la carte) et rayon maximal
+(borne haute de ce sélecteur, 150 km par défaut, 500 km au plus), nombre de
+véhicules et durée du cache. Le secret est chiffré en
 base via GLPIKey (hook `secured_configs`) et n'apparaît jamais dans le dépôt.
 
 Onglet *Affichage* : couleurs des marqueurs, filtres, titre de la bulle (nom

@@ -67,6 +67,18 @@ msgstr ""
 msgid "Search radius (km)"
 msgstr ""
 
+#: templates/config_display.html.twig
+msgid "Default value of the radius selector of the map."
+msgstr ""
+
+#: templates/config_display.html.twig
+msgid "Maximum search radius (km)"
+msgstr ""
+
+#: templates/config_display.html.twig
+msgid "Widest search a user can select on the map."
+msgstr ""
+
 #: templates/config.html.twig
 msgid "Maximum number of vehicles displayed"
 msgstr ""
