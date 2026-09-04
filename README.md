@@ -146,11 +146,15 @@ techniciens à proximité* (onglet *Fleetview* de la fiche Profil, droit
 `plugin_fleetview_map`). Sans ce droit, le bouton n'apparaît pas et les
 routes du plugin répondent 403, quel que soit le droit de lecture sur le
 ticket. À l'installation, le droit est accordé aux profils autorisés à
-attribuer des tickets, à d'autres ou à eux-mêmes (technicien, hotliner,
-superviseur, admin, super-admin) ; les profils self-service et lecture seule
-ne l'ont pas. Les personnalisations ultérieures sont conservées à la mise à
-jour. L'attribution depuis la carte requiert en plus le droit d'attribuer
-les tickets.
+attribuer des tickets, à d'autres ou à eux-mêmes : avec les profils GLPI
+d'origine, technicien, hotliner, superviseur, admin, super-admin et
+observateur (ce dernier peut s'attribuer un ticket) ; les profils
+self-service et lecture seule ne l'ont pas. Vérifiez cette attribution
+après l'installation et retirez le droit aux profils qui n'ont pas à voir
+la flotte, par exemple observateur s'il est réservé à des managers ou des
+auditeurs ; les personnalisations sont conservées à la mise à jour. Un
+profil créé après l'installation n'a pas le droit. L'attribution depuis la
+carte requiert en plus le droit d'attribuer les tickets.
 
 Le planning listé dans la bulle (tâches planifiées et événements externes)
 suit le droit GLPI *Planning* du profil (onglet *Assistance*) : « voir tous

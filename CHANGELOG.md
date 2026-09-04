@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- The profiles granted the map right on install are documented and pinned by
+  a test: with stock GLPI profiles, Observer and Supervisor are granted too,
+  as they may assign tickets (Observer to itself), which the documentation
+  did not list. The administrator is invited to review the grant after the
+  installation (marketplace security review of 0.5.0,
+  [#12](https://github.com/JeremieMercier/fleetview/issues/12)).
 - The radius selector of the map is bounded by the new maximum radius
   setting: the configured radius was only a default, any map user could
   widen the search to the provider maximum of 500 km whatever the
