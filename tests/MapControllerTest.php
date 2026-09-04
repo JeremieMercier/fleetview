@@ -800,7 +800,9 @@ final class MapControllerTest extends DbTestCase
         $tech_id = getItemByTypeName(User::class, 'tech', true);
         VehicleMapping::save('202', 'Martin Sophie', $tech_id);
 
-        $job    = $this->createTicket();
+        // A ticket the requester may read (its own), so that only the
+        // private task right decides
+        $job    = $this->createTicket(0, $requester_id);
         $public = $this->createPlannedTask($job, $tech_id, 24, 26);
         $this->createPlannedTask($job, $tech_id, 48, 50, ['is_private' => 1]);
 
@@ -812,6 +814,47 @@ final class MapControllerTest extends DbTestCase
         $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
 
         $this->assertSame([$public], array_column($payload['vehicles'][0]['planned_tasks'], 'id'));
+    }
+
+    public function testTicketVehiclesHidesTasksOfTicketsTheUserMayNotRead(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi();
+        $requester_id = getItemByTypeName(User::class, 'post-only', true);
+        $ticket  = $this->createTicket($this->createGeoLocation()->getID(), $requester_id);
+        $tech_id = getItemByTypeName(User::class, 'tech', true);
+        VehicleMapping::save('202', 'Martin Sophie', $tech_id);
+
+        // The technician is planned on a ticket of the requester and on a
+        // ticket of somebody else; the requester profile only reads its own
+        // tickets ("see my tickets"), the second one is out of reach
+        $mine  = $this->createPlannedTask($this->createTicket(0, $requester_id), $tech_id, 24, 26);
+        $other = $this->createPlannedTask($this->createTicket(), $tech_id, 48, 50);
+
+        // Map right and "see all plannings" granted, ticket and task rights
+        // still those of the requester profile
+        $this->login('post-only');
+        $_SESSION['glpiactiveprofile'][Profile::RIGHTNAME] = READ;
+        $_SESSION['glpiactiveprofile']['planning']         = Planning::READALL;
+        $this->assertFalse((bool) Session::haveRight('ticket', Ticket::READALL));
+        $this->assertTrue((bool) Session::haveRight('ticket', Ticket::READMY));
+        $this->assertTrue((bool) Session::haveRight('task', TicketTask::SEEPUBLIC));
+
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $this->assertSame([$mine], array_column($payload['vehicles'][0]['planned_tasks'], 'id'));
+        $this->assertSame(0, $payload['vehicles'][0]['planned_tasks_more']);
+
+        // Without any task right, no task at all (the section stays, for
+        // the external events)
+        $_SESSION['glpiactiveprofile']['task'] = 0;
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $this->assertSame([], $payload['vehicles'][0]['planned_tasks']);
+
+        // "See all tickets": both listed
+        $_SESSION['glpiactiveprofile']['task']   = TicketTask::SEEPUBLIC;
+        $_SESSION['glpiactiveprofile']['ticket'] = Ticket::READALL;
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $this->assertSame([$mine, $other], array_column($payload['vehicles'][0]['planned_tasks'], 'id'));
     }
 
     public function testTicketVehiclesLabelsMultiDayTasksWithBothDates(): void

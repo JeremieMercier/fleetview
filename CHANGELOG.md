@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- The planned tasks of the marker popup follow the ticket read rights of the
+  user (see all / see group / see mine / see assigned...), as the GLPI
+  planning does, and need a task right: a profile allowed to see all
+  plannings but not all tickets could read the numbers and titles of tickets
+  it may not open (marketplace security review of 0.5.0,
+  [#12](https://github.com/JeremieMercier/fleetview/issues/12)).
 - The profiles granted the map right on install are documented and pinned by
   a test: with stock GLPI profiles, Observer and Supervisor are granted too,
   as they may assign tickets (Observer to itself), which the documentation

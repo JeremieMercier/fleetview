@@ -167,9 +167,23 @@ final class TechnicianAgenda
         /** @var DBmysql $DB */
         global $DB;
 
+        // Same rules as the GLPI planning, which filters every task through
+        // `CommonITILTask::canViewItem()`: a task right is needed, and the
+        // ticket must be readable by the user (the popup exposes its number,
+        // its title and a link to it)
+        if (!Session::haveRightsOr(TicketTask::$rightname, [TicketTask::SEEPUBLIC, TicketTask::SEEPRIVATE])) {
+            return [];
+        }
+
         $me       = Session::getLoginUserID();
         $task_tbl = TicketTask::getTable();
         $tkt_tbl  = Ticket::getTable();
+
+        // Empty for "see all tickets", the actor-based restriction (with the
+        // joins it needs) otherwise
+        $profile       = Ticket::getCriteriaFromProfile();
+        $profile_where = is_array($profile['WHERE'] ?? null) ? $profile['WHERE'] : [];
+        $profile_joins = is_array($profile['LEFT JOIN'] ?? null) ? $profile['LEFT JOIN'] : [];
 
         $where = [
             $task_tbl . '.users_id_tech' => $users_ids,
@@ -190,7 +204,14 @@ final class TechnicianAgenda
             ];
         }
 
+        foreach ($profile_where as $criterion) {
+            $where[] = $criterion;
+        }
+
         $iterator = $DB->request([
+            // The profile joins (ticket actors) may match several rows per
+            // ticket
+            'DISTINCT'   => true,
             'SELECT'     => [
                 $task_tbl . '.id',
                 $task_tbl . '.users_id_tech',
@@ -207,6 +228,7 @@ final class TechnicianAgenda
             'INNER JOIN' => [
                 $tkt_tbl => ['ON' => [$task_tbl => 'tickets_id', $tkt_tbl => 'id']],
             ],
+            'LEFT JOIN'  => $profile_joins,
             'WHERE'      => $where,
             'ORDER'      => [$task_tbl . '.begin ASC', $task_tbl . '.id ASC'],
         ]);
