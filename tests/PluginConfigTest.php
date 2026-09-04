@@ -47,8 +47,13 @@ final class PluginConfigTest extends TestCase
     {
         $defaults = PluginConfig::getDefaults();
 
-        // The out-of-the-box radius must be 50 km
+        // The out-of-the-box radius must be 50 km, widenable up to 150 km
         $this->assertSame('50', $defaults['search_radius']);
+        $this->assertSame('150', $defaults['search_radius_max']);
+
+        // Routing is opt-in: location data must not reach a third party
+        // unless the administrator decided so
+        $this->assertSame('', $defaults['routing_base_url']);
 
         // No credential is ever shipped as a default value
         $this->assertSame('', $defaults['customer_id']);
@@ -162,5 +167,33 @@ final class PluginConfigTest extends TestCase
         $this->assertNotSame('', PluginConfig::getStatusLabel('IN_MAINTENANCE'));
         $this->assertNotSame('', PluginConfig::getStatusLabel('SOLD'));
         $this->assertSame('UNKNOWN_STATUS', PluginConfig::getStatusLabel('UNKNOWN_STATUS'));
+    }
+
+    /**
+     * @return iterable<string, array{string, bool}>
+     */
+    public static function externalHostProvider(): iterable
+    {
+        yield 'empty'            => ['', false];
+        yield 'blank'            => ['   ', false];
+        yield 'localhost'        => ['http://localhost:5000', false];
+        yield 'localhost domain' => ['http://osrm.localhost', false];
+        yield '.local'           => ['http://osrm.local:5000', false];
+        yield 'bare hostname'    => ['http://osrm-server:5000', false];
+        yield 'loopback'         => ['http://127.0.0.1:5000', false];
+        yield 'private 10/8'     => ['http://10.1.2.3:5000/', false];
+        yield 'private 172.16'   => ['http://172.20.0.5', false];
+        yield 'private 192.168'  => ['http://192.168.1.10:5000', false];
+        yield 'ipv6 loopback'    => ['http://[::1]:5000', false];
+        yield 'public demo'      => ['https://router.project-osrm.org', true];
+        yield 'public domain'    => ['http://osrm.example.com:5000/', true];
+        yield 'public ip'        => ['http://8.8.8.8:5000', true];
+        yield 'not an url'       => ['osrm', false];
+    }
+
+    #[DataProvider('externalHostProvider')]
+    public function testIsExternalHost(string $url, bool $expected): void
+    {
+        $this->assertSame($expected, PluginConfig::isExternalHost($url));
     }
 }

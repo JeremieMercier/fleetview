@@ -14,8 +14,9 @@ la distance par la route (OSRM), et le **planning à venir** du technicien
 associé : tâches de tickets planifiées et événements externes du planning,
 triés chronologiquement, avec un badge « en cours », « aujourd'hui » ou
 « demain ». L'itinéraire routier des trois véhicules les plus proches est
-tracé sur la carte, dans la couleur de leur marqueur. Les droits GLPI s'appliquent (tâches privées,
-visibilité du planning, entités).
+tracé sur la carte, dans la couleur de leur marqueur. Les droits GLPI
+s'appliquent : tâches privées, visibilité du planning et des tickets, et
+entités des associations véhicule / technicien.
 
 ## Prérequis
 
@@ -38,12 +39,12 @@ s'installe dans le dossier `marketplace/` de GLPI (le dossier `plugins/`
 reste réservé au développement).
 
 ```bash
-# Depuis le dossier marketplace de GLPI, en remplaçant 0.5.0 par la version voulue
+# Depuis le dossier marketplace de GLPI, en remplaçant 0.6.0 par la version voulue
 cd /chemin/vers/glpi/marketplace
 
 # 1. Télécharger et extraire l'archive (elle contient le dossier fleetview/)
-curl -LO https://github.com/JeremieMercier/fleetview/releases/download/0.5.0/glpi-fleetview-0.5.0.tar.bz2
-tar -xjf glpi-fleetview-0.5.0.tar.bz2 && rm glpi-fleetview-0.5.0.tar.bz2
+curl -LO https://github.com/JeremieMercier/fleetview/releases/download/0.6.0/glpi-fleetview-0.6.0.tar.bz2
+tar -xjf glpi-fleetview-0.6.0.tar.bz2 && rm glpi-fleetview-0.6.0.tar.bz2
 
 # 2. Donner les fichiers à l'utilisateur du serveur web (www-data, apache, nginx…)
 chown -R www-data:www-data fleetview
@@ -72,9 +73,9 @@ jour. Faire tout de même une sauvegarde de la base avant.
 cd /chemin/vers/glpi/marketplace
 
 # 1. Remplacer les fichiers par ceux de la nouvelle version
-curl -LO https://github.com/JeremieMercier/fleetview/releases/download/0.5.0/glpi-fleetview-0.5.0.tar.bz2
+curl -LO https://github.com/JeremieMercier/fleetview/releases/download/0.6.0/glpi-fleetview-0.6.0.tar.bz2
 rm -rf fleetview
-tar -xjf glpi-fleetview-0.5.0.tar.bz2 && rm glpi-fleetview-0.5.0.tar.bz2
+tar -xjf glpi-fleetview-0.6.0.tar.bz2 && rm glpi-fleetview-0.6.0.tar.bz2
 chown -R www-data:www-data fleetview
 
 # 2. Appliquer la mise à jour (le plugin passe en « À mettre à jour ») et le
@@ -120,8 +121,13 @@ php bin/console glpi:plugin:activate fleetview
 
 *Configuration → Générale → onglet Fleetview* : URL de base, numéro client
 Connect, utilisateur Partner (HTTP Basic) et secret de l'API, rayon de
-recherche, nombre de véhicules et durée du cache. Le secret est chiffré en
+recherche (valeur par défaut du sélecteur de la carte) et rayon maximal
+(borne haute de ce sélecteur, 150 km par défaut, 500 km au plus), nombre de
+véhicules et durée du cache. Le secret est chiffré en
 base via GLPIKey (hook `secured_configs`) et n'apparaît jamais dans le dépôt.
+
+Le service de routage (temps de trajet, itinéraires) est désactivé par
+défaut : voir la section dédiée ci-dessous avant de renseigner son URL.
 
 Onglet *Affichage* : couleurs des marqueurs, filtres, titre de la bulle (nom
 du technicien GLPI associé ou nom du véhicule Masternaut), affichage de la
@@ -129,6 +135,14 @@ plaque d'immatriculation, tracé des itinéraires, nombre d'entrées du planning
 listées dans la bulle (`0` masque la section), prise en compte des
 événements externes (activée par défaut ; les événements récurrents ne sont
 pas développés) et affichage des véhicules sans technicien associé.
+
+Onglet *Associations véhicules / techniciens* : chaque véhicule de la flotte
+est associé à un utilisateur GLPI, dans une entité, avec ou sans ses
+sous-entités (par défaut l'entité active, sous-entités comprises). Voir la
+section Droits pour la portée de ces associations. Le tableau est paginé
+selon la préférence GLPI « nombre d'éléments par page », filtres et tri
+portant sur toute la flotte ; les associations s'enregistrent page par page,
+et les suggestions par nom ne s'appliquent qu'en cliquant dessus.
 
 La carte propose un interrupteur « Véhicules sans technicien » : désactivé
 (valeur par défaut configurable), seuls les véhicules associés à un
@@ -144,11 +158,33 @@ techniciens à proximité* (onglet *Fleetview* de la fiche Profil, droit
 `plugin_fleetview_map`). Sans ce droit, le bouton n'apparaît pas et les
 routes du plugin répondent 403, quel que soit le droit de lecture sur le
 ticket. À l'installation, le droit est accordé aux profils autorisés à
-attribuer des tickets, à d'autres ou à eux-mêmes (technicien, hotliner,
-superviseur, admin, super-admin) ; les profils self-service et lecture seule
-ne l'ont pas. Les personnalisations ultérieures sont conservées à la mise à
-jour. L'attribution depuis la carte requiert en plus le droit d'attribuer
-les tickets.
+attribuer des tickets, à d'autres ou à eux-mêmes : avec les profils GLPI
+d'origine, technicien, hotliner, superviseur, admin, super-admin et
+observateur (ce dernier peut s'attribuer un ticket) ; les profils
+self-service et lecture seule ne l'ont pas. Vérifiez cette attribution
+après l'installation et retirez le droit aux profils qui n'ont pas à voir
+la flotte, par exemple observateur s'il est réservé à des managers ou des
+auditeurs ; les personnalisations sont conservées à la mise à jour. Un
+profil créé après l'installation n'a pas le droit. L'attribution depuis la
+carte requiert en plus le droit d'attribuer les tickets, et n'accepte que
+les techniciens que la carte propose pour ce ticket : associés à un
+véhicule (association explicite ou correspondance par nom) et habilités à
+prendre des tickets dans l'entité du ticket, comme la liste déroulante
+native des acteurs.
+
+**Entités.** La flotte Masternaut est globale (un seul compte), la carte
+affiche donc les véhicules autour du ticket quelle que soit l'entité. Ce
+qui est propre à GLPI, l'identité du technicien qui conduit chaque véhicule,
+est en revanche limité à l'entité du ticket, comme la liste déroulante
+native des acteurs : une association n'est prise en compte que pour les
+tickets de son entité (et de ses sous-entités si l'option est cochée), et la
+correspondance par nom ne considère que les utilisateurs ayant un profil
+couvrant l'entité du ticket. Sur les autres tickets, le véhicule apparaît
+comme « sans technicien », sans nom et sans bouton d'attribution ; par
+défaut, ces véhicules sont masqués. Les associations existantes sont rattachées à
+l'entité racine avec sous-entités lors de la mise à jour vers 0.6.0, ce qui
+conserve le comportement précédent : restreindre ensuite chaque association
+à une entité est un choix de l'administrateur.
 
 Le planning listé dans la bulle (tâches planifiées et événements externes)
 suit le droit GLPI *Planning* du profil (onglet *Assistance*) : « voir tous
@@ -169,11 +205,20 @@ git).
 
 Les temps de trajet et les itinéraires sont calculés par un serveur
 [OSRM](https://project-osrm.org) dont l'URL est configurable (onglet
-Fleetview, vide = désactivé). Les coordonnées du lieu du ticket et des
-véhicules sont envoyées à ce serveur.
+Fleetview). Les coordonnées GPS du lieu du ticket et des véhicules affichés
+sont envoyées à ce serveur à chaque ouverture de la carte : des coordonnées
+seules, sans nom ni identifiant, accompagnées de l'adresse IP du serveur
+GLPI.
 
-Par défaut, le plugin pointe sur le serveur de démonstration
-`https://router.project-osrm.org`. Ses contraintes :
+**Le routage est désactivé par défaut** (URL vide) : la carte fonctionne
+sans, les bulles indiquent alors la distance à vol d'oiseau et les véhicules
+sont triés selon elle. L'activer est une décision explicite de
+l'administrateur ; quand l'URL renseignée pointe hors du réseau de
+l'organisation, le formulaire affiche un avertissement sur ce transfert à
+un tiers.
+
+Le serveur de démonstration du projet, `https://router.project-osrm.org`,
+peut être renseigné pour un essai. Ses contraintes :
 
 - **Serveur de démonstration, sans garantie de service** : le projet OSRM le
   réserve aux usages modérés et peut bloquer les usages intensifs. Le
@@ -198,8 +243,8 @@ Tout échec du routage est dégradé silencieusement : la carte et les
 marqueurs restent affichés, seuls les temps de trajet et les itinéraires
 manquent (tri à vol d'oiseau).
 
-**Auto-hébergement** : pour un usage soutenu ou pour ne pas envoyer de
-coordonnées à un tiers, OSRM s'installe avec l'image Docker
+**Auto-hébergement** (recommandé) : pour un usage soutenu ou pour ne pas
+envoyer de coordonnées à un tiers, OSRM s'installe avec l'image Docker
 `osrm/osrm-backend` et un extrait OpenStreetMap de la zone couverte (par
 exemple depuis [Geofabrik](https://download.geofabrik.de/)) :
 

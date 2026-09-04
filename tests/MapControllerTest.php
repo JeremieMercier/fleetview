@@ -52,6 +52,8 @@ use Group;
 use Group_User;
 use Location;
 use Planning;
+use Profile as CoreProfile;
+use Profile_User;
 use PlanningEventCategory;
 use PlanningExternalEvent;
 use Session;
@@ -87,13 +89,13 @@ final class MapControllerTest extends DbTestCase
         return $location;
     }
 
-    private function createTicket(int $locations_id = 0, int $requester_id = 0): Ticket
+    private function createTicket(int $locations_id = 0, int $requester_id = 0, int $entities_id = 0): Ticket
     {
         $ticket = new Ticket();
         $input  = [
             'name'         => 'Ticket test fictif',
             'content'      => 'Contenu de test fictif',
-            'entities_id'  => $this->rootEntityId(),
+            'entities_id'  => $entities_id > 0 ? $entities_id : $this->rootEntityId(),
             'locations_id' => $locations_id,
         ];
         if ($requester_id > 0) {
@@ -203,19 +205,54 @@ final class MapControllerTest extends DbTestCase
         $this->assertSame([], $payload['vehicles']);
     }
 
-    public function testAssignTechnicianAddsTheActorOnce(): void
+    /**
+     * Active user holding the given profile in an entity, linked to a fleet
+     * vehicle when an asset id is given.
+     */
+    private function createTechnician(string $profile_name, int $entities_id, bool $is_recursive, ?string $asset_id = null, array $extra = []): int
     {
-        $this->login('glpi');
-        $ticket = $this->createTicket();
-
-        $technician = new User();
-        $technician_id = $technician->add([
+        $user     = new User();
+        $users_id = $user->add($extra + [
             'name'      => 'fake_tech_' . uniqid(),
             'firstname' => 'Jean',
             'realname'  => 'Dupont',
             'is_active' => 1,
         ]);
-        $this->assertGreaterThan(0, $technician_id);
+        $this->assertGreaterThan(0, $users_id);
+
+        if ($profile_name !== '') {
+            $profile_user = new Profile_User();
+            $this->assertGreaterThan(0, $profile_user->add([
+                'users_id'     => $users_id,
+                'profiles_id'  => getItemByTypeName(CoreProfile::class, $profile_name, true),
+                'entities_id'  => $entities_id,
+                'is_recursive' => $is_recursive ? 1 : 0,
+            ]));
+        }
+
+        if ($asset_id !== null) {
+            VehicleMapping::save($asset_id, 'Vehicle ' . $asset_id, $users_id);
+        }
+
+        return $users_id;
+    }
+
+    private function countAssignees(Ticket $ticket, int $users_id): int
+    {
+        return countElementsInTable(Ticket_User::getTable(), [
+            'tickets_id' => $ticket->getID(),
+            'users_id'   => $users_id,
+            'type'       => CommonITILActor::ASSIGN,
+        ]);
+    }
+
+    public function testAssignTechnicianAddsTheActorOnce(): void
+    {
+        $this->login('glpi');
+        $ticket = $this->createTicket();
+
+        // Linked to a vehicle, technician of the root entity tree
+        $technician_id = $this->createTechnician('Technician', $this->rootEntityId(), true, '201');
 
         $request = Request::create('', 'POST', content: json_encode(['users_id' => $technician_id]));
 
@@ -258,6 +295,77 @@ final class MapControllerTest extends DbTestCase
         // Unparsable payload
         $request = Request::create('', 'POST', content: 'not json');
         $this->assertSame(400, (new MapController())->assignTechnician($request, $ticket->getID())->getStatusCode());
+    }
+
+    public function testAssignTechnicianOnlyAcceptsTheTechniciansOfferedByTheMap(): void
+    {
+        $this->login('glpi');
+        $root   = $this->rootEntityId();
+        $ticket = $this->createTicket();
+
+        $entity = new Entity();
+        $sub    = $entity->add(['name' => 'Fleetview sub ' . uniqid(), 'entities_id' => $root]);
+        $this->assertGreaterThan(0, $sub);
+
+        $rejected = [
+            // Active technician, not linked to any vehicle
+            'unlinked'         => $this->createTechnician('Technician', $root, true),
+            // Linked, but no profile at all (service account)
+            'no profile'       => $this->createTechnician('', $root, true, '211'),
+            // Linked, but the profile may not take tickets
+            'requester'        => $this->createTechnician('Self-Service', $root, true, '212'),
+            // Linked technician of another entity (unrelated to the ticket)
+            'other entity'     => $this->createTechnician('Technician', $sub, false, '213'),
+            // Linked technician of the root entity without recursion:
+            // unrelated to a ticket of a sub-entity (checked below)
+        ];
+
+        foreach ($rejected as $case => $users_id) {
+            $request  = Request::create('', 'POST', content: json_encode(['users_id' => $users_id]));
+            $response = (new MapController())->assignTechnician($request, $ticket->getID());
+            $this->assertSame(403, $response->getStatusCode(), $case);
+            $this->assertSame(0, $this->countAssignees($ticket, $users_id), $case);
+        }
+
+        // Linked technician whose rights cover the ticket entity: accepted
+        $accepted = $this->createTechnician('Technician', $root, true, '214');
+        $request  = Request::create('', 'POST', content: json_encode(['users_id' => $accepted]));
+        $this->assertSame(200, (new MapController())->assignTechnician($request, $ticket->getID())->getStatusCode());
+        $this->assertSame(1, $this->countAssignees($ticket, $accepted));
+
+        // Ticket of the sub-entity: the recursive technician is accepted,
+        // the root-only one is not
+        $sub_ticket = new Ticket();
+        $this->assertGreaterThan(0, $sub_ticket->add([
+            'name'        => 'Ticket test fictif',
+            'content'     => 'Contenu de test fictif',
+            'entities_id' => $sub,
+        ]));
+        $root_only = $this->createTechnician('Technician', $root, false, '215');
+        $request   = Request::create('', 'POST', content: json_encode(['users_id' => $root_only]));
+        $this->assertSame(403, (new MapController())->assignTechnician($request, $sub_ticket->getID())->getStatusCode());
+        $request   = Request::create('', 'POST', content: json_encode(['users_id' => $accepted]));
+        $this->assertSame(200, (new MapController())->assignTechnician($request, $sub_ticket->getID())->getStatusCode());
+    }
+
+    public function testAssignTechnicianAcceptsNameMatchedTechniciansWhenEnabled(): void
+    {
+        $this->login('glpi');
+        $ticket = $this->createTicket($this->createGeoLocation()->getID());
+
+        // Named after the fictional vehicle "Dupont Jean" (asset 201), not
+        // explicitly linked; a technician of the root entity tree
+        $matched = $this->createTechnician('Technician', $this->rootEntityId(), true);
+        $request = Request::create('', 'POST', content: json_encode(['users_id' => $matched]));
+
+        // Name matching disabled: not offered by the map, rejected
+        $this->configurePluginApi(['name_matching_fallback' => '0']);
+        $this->assertSame(403, $this->mockedController()->assignTechnician($request, $ticket->getID())->getStatusCode());
+
+        // Enabled: the vehicle is near the ticket, the technician is offered
+        $this->configurePluginApi(['name_matching_fallback' => '1']);
+        $this->assertSame(200, $this->mockedController()->assignTechnician($request, $ticket->getID())->getStatusCode());
+        $this->assertSame(1, $this->countAssignees($ticket, $matched));
     }
 
     public function testAssignTechnicianRequiresTheAssignRight(): void
@@ -402,19 +510,82 @@ final class MapControllerTest extends DbTestCase
         $this->configurePluginApi(['name_matching_fallback' => '1']);
         $ticket = $this->createTicket($this->createGeoLocation()->getID());
 
-        $technician = new User();
-        $technician_id = $technician->add([
-            'name'      => 'fake_tech_' . uniqid(),
-            'firstname' => 'Jean',
-            'realname'  => 'Dupont',
-            'is_active' => 1,
-        ]);
-        $this->assertGreaterThan(0, $technician_id);
+        // Named after the fictional vehicle "Dupont Jean", technician of
+        // the root entity tree
+        $technician_id = $this->createTechnician('Technician', $this->rootEntityId(), true);
 
         $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
 
         $by_id = array_column($payload['vehicles'], 'user_id', 'id');
         $this->assertSame($technician_id, $by_id['201']);
+    }
+
+    public function testTicketVehiclesOnlyLinksAssociationsCoveringTheTicketEntity(): void
+    {
+        // Session on the whole tree: the ticket entity decides, not the
+        // entities the user may access
+        $this->login('glpi');
+        $this->setEntity('_test_root_entity', true);
+        $this->configurePluginApi();
+        $child_1  = getItemByTypeName(Entity::class, '_test_child_1', true);
+        $child_2  = getItemByTypeName(Entity::class, '_test_child_2', true);
+        $location = $this->createGeoLocation()->getID();
+
+        // Vehicle 201 is associated in child 2 only, vehicle 202 at the root
+        // for the whole tree
+        $tech_2 = $this->createTechnician('Technician', $child_2, false, null, ['firstname' => 'Paul', 'realname' => 'Durand']);
+        VehicleMapping::save('201', 'Dupont Jean', $tech_2, $child_2, false);
+        $tech_tree = $this->createTechnician('Technician', $this->rootEntityId(), true, null, ['firstname' => 'Sophie', 'realname' => 'Martin']);
+        VehicleMapping::save('202', 'Martin Sophie', $tech_tree, $this->rootEntityId(), true);
+
+        // Ticket of child 1: the association of child 2 does not apply,
+        // vehicle 201 is unlinked and its technician is not named
+        $ticket  = $this->createTicket($location, 0, $child_1);
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $by_id   = array_column($payload['vehicles'], null, 'id');
+        $this->assertFalse($by_id['201']['technician_linked']);
+        $this->assertNull($by_id['201']['user_id']);
+        $this->assertNull($by_id['201']['technician_name']);
+        $this->assertTrue($by_id['202']['technician_linked']);
+        $this->assertSame($tech_tree, $by_id['202']['user_id']);
+
+        // Nor can that technician be assigned to it
+        $request = Request::create('', 'POST', content: json_encode(['users_id' => $tech_2]));
+        $this->assertSame(403, $this->mockedController()->assignTechnician($request, $ticket->getID())->getStatusCode());
+
+        // Ticket of child 2: linked
+        $ticket  = $this->createTicket($location, 0, $child_2);
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $by_id   = array_column($payload['vehicles'], null, 'id');
+        $this->assertTrue($by_id['201']['technician_linked']);
+        $this->assertSame($tech_2, $by_id['201']['user_id']);
+        $this->assertSame($tech_tree, $by_id['202']['user_id']);
+    }
+
+    public function testTicketVehiclesNameMatchingIsScopedToTheTicketEntity(): void
+    {
+        $this->login('glpi');
+        $this->setEntity('_test_root_entity', true);
+        $this->configurePluginApi(['name_matching_fallback' => '1']);
+        $child_1  = getItemByTypeName(Entity::class, '_test_child_1', true);
+        $child_2  = getItemByTypeName(Entity::class, '_test_child_2', true);
+        $location = $this->createGeoLocation()->getID();
+
+        // "Jean Dupont" only holds a profile in child 2
+        $technician_id = $this->createTechnician('Technician', $child_2, false);
+
+        // On a ticket of child 1, the vehicle name matches nobody
+        $ticket  = $this->createTicket($location, 0, $child_1);
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $by_id   = array_column($payload['vehicles'], null, 'id');
+        $this->assertFalse($by_id['201']['technician_linked']);
+        $this->assertNull($by_id['201']['technician_name']);
+
+        // On a ticket of child 2, it does
+        $ticket  = $this->createTicket($location, 0, $child_2);
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $by_id   = array_column($payload['vehicles'], null, 'id');
+        $this->assertSame($technician_id, $by_id['201']['user_id']);
     }
 
     public function testTicketVehiclesHidesUnlinkedVehiclesWhenConfigured(): void
@@ -482,14 +653,9 @@ final class MapControllerTest extends DbTestCase
         $this->configurePluginApi(['modal_show_unlinked' => '0', 'name_matching_fallback' => '1']);
         $ticket = $this->createTicket($this->createGeoLocation()->getID());
 
-        $technician = new User();
-        $technician_id = $technician->add([
-            'name'      => 'fake_tech_' . uniqid(),
-            'firstname' => 'Jean',
-            'realname'  => 'Dupont',
-            'is_active' => 1,
-        ]);
-        $this->assertGreaterThan(0, $technician_id);
+        // Named after the fictional vehicle "Dupont Jean", technician of
+        // the root entity tree
+        $technician_id = $this->createTechnician('Technician', $this->rootEntityId(), true);
 
         $one_route = [new Response(200, [], json_encode(['code' => 'Ok', 'durations' => [[0, 1800]], 'distances' => [[0, 12000]]]))];
         $payload = $this->payload($this->mockedController(null, $one_route)->ticketVehicles(Request::create(''), $ticket->getID()));
@@ -513,15 +679,50 @@ final class MapControllerTest extends DbTestCase
         $this->assertSame(['202'], array_column($payload['vehicles'], 'id'));
     }
 
-    public function testTicketVehiclesClampsTheRadiusOverride(): void
+    public function testTicketVehiclesClampsTheRadiusOverrideToTheConfiguredMaximum(): void
     {
         $this->login('glpi');
-        $this->configurePluginApi();
+        $this->configurePluginApi(['search_radius' => '50', 'search_radius_max' => '75']);
         $ticket = $this->createTicket($this->createGeoLocation()->getID());
 
-        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create('', 'GET', ['radius' => '9999']), $ticket->getID()));
+        // No override: the configured radius
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $this->assertSame(50, (int) $payload['radius_km']);
+        $this->assertSame(75, (int) $payload['radius_max_km']);
 
-        $this->assertSame(500, (int) $payload['radius_km']);
+        // Wider than the maximum: the maximum, not the provider limit of 500 km
+        foreach (['9999', '500', '76'] as $radius) {
+            $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create('', 'GET', ['radius' => $radius]), $ticket->getID()));
+            $this->assertSame(75, (int) $payload['radius_km'], 'radius=' . $radius);
+        }
+
+        // Within the maximum: honoured, wider than the default included
+        foreach (['25', '75'] as $radius) {
+            $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create('', 'GET', ['radius' => $radius]), $ticket->getID()));
+            $this->assertSame((int) $radius, (int) $payload['radius_km'], 'radius=' . $radius);
+        }
+
+        // Below the minimum
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create('', 'GET', ['radius' => '0']), $ticket->getID()));
+        $this->assertSame(1, (int) $payload['radius_km']);
+    }
+
+    public function testTicketVehiclesBoundsTheDefaultRadiusByTheConfiguredMaximum(): void
+    {
+        $this->login('glpi');
+        // Inconsistent settings (default wider than the maximum, maximum
+        // above the provider limit): the maximum wins, capped at 500 km
+        $this->configurePluginApi(['search_radius' => '300', 'search_radius_max' => '9999']);
+        $ticket = $this->createTicket($this->createGeoLocation()->getID());
+
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $this->assertSame(300, (int) $payload['radius_km']);
+        $this->assertSame(500, (int) $payload['radius_max_km']);
+
+        $this->configurePluginApi(['search_radius' => '300', 'search_radius_max' => '100']);
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $this->assertSame(100, (int) $payload['radius_km']);
+        $this->assertSame(100, (int) $payload['radius_max_km']);
     }
 
     public function testTicketVehiclesReportsApiFailures(): void
@@ -765,7 +966,9 @@ final class MapControllerTest extends DbTestCase
         $tech_id = getItemByTypeName(User::class, 'tech', true);
         VehicleMapping::save('202', 'Martin Sophie', $tech_id);
 
-        $job    = $this->createTicket();
+        // A ticket the requester may read (its own), so that only the
+        // private task right decides
+        $job    = $this->createTicket(0, $requester_id);
         $public = $this->createPlannedTask($job, $tech_id, 24, 26);
         $this->createPlannedTask($job, $tech_id, 48, 50, ['is_private' => 1]);
 
@@ -777,6 +980,47 @@ final class MapControllerTest extends DbTestCase
         $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
 
         $this->assertSame([$public], array_column($payload['vehicles'][0]['planned_tasks'], 'id'));
+    }
+
+    public function testTicketVehiclesHidesTasksOfTicketsTheUserMayNotRead(): void
+    {
+        $this->login('glpi');
+        $this->configurePluginApi();
+        $requester_id = getItemByTypeName(User::class, 'post-only', true);
+        $ticket  = $this->createTicket($this->createGeoLocation()->getID(), $requester_id);
+        $tech_id = getItemByTypeName(User::class, 'tech', true);
+        VehicleMapping::save('202', 'Martin Sophie', $tech_id);
+
+        // The technician is planned on a ticket of the requester and on a
+        // ticket of somebody else; the requester profile only reads its own
+        // tickets ("see my tickets"), the second one is out of reach
+        $mine  = $this->createPlannedTask($this->createTicket(0, $requester_id), $tech_id, 24, 26);
+        $other = $this->createPlannedTask($this->createTicket(), $tech_id, 48, 50);
+
+        // Map right and "see all plannings" granted, ticket and task rights
+        // still those of the requester profile
+        $this->login('post-only');
+        $_SESSION['glpiactiveprofile'][Profile::RIGHTNAME] = READ;
+        $_SESSION['glpiactiveprofile']['planning']         = Planning::READALL;
+        $this->assertFalse((bool) Session::haveRight('ticket', Ticket::READALL));
+        $this->assertTrue((bool) Session::haveRight('ticket', Ticket::READMY));
+        $this->assertTrue((bool) Session::haveRight('task', TicketTask::SEEPUBLIC));
+
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $this->assertSame([$mine], array_column($payload['vehicles'][0]['planned_tasks'], 'id'));
+        $this->assertSame(0, $payload['vehicles'][0]['planned_tasks_more']);
+
+        // Without any task right, no task at all (the section stays, for
+        // the external events)
+        $_SESSION['glpiactiveprofile']['task'] = 0;
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $this->assertSame([], $payload['vehicles'][0]['planned_tasks']);
+
+        // "See all tickets": both listed
+        $_SESSION['glpiactiveprofile']['task']   = TicketTask::SEEPUBLIC;
+        $_SESSION['glpiactiveprofile']['ticket'] = Ticket::READALL;
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $this->assertSame([$mine, $other], array_column($payload['vehicles'][0]['planned_tasks'], 'id'));
     }
 
     public function testTicketVehiclesLabelsMultiDayTasksWithBothDates(): void

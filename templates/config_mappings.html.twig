@@ -29,78 +29,98 @@
  # -------------------------------------------------------------------------
  #}
 
-<form method="post" action="{{ mappings_action }}">
-    <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token() }}" />
+<div class="card">
+    <div class="card-header d-flex align-items-center">
+        <h3 class="card-title mb-0">
+            <i class="ti ti-car me-2"></i>
+            {{ __('Vehicle to technician associations', 'fleetview') }}
+        </h3>
+        {% if fleet_size > 0 %}
+            <span class="badge bg-secondary-lt ms-auto">{{ total }} / {{ fleet_size }}</span>
+        {% endif %}
+    </div>
+    <div class="card-body">
+        {% if vehicles_error is not null %}
+            <div class="alert alert-warning" role="alert">{{ vehicles_error }}</div>
+        {% elseif fleet_size == 0 %}
+            <div class="alert alert-info" role="alert">
+                {{ __('Configure and save the API access in the API tab to list the fleet vehicles.', 'fleetview') }}
+            </div>
+        {% else %}
+            <p class="text-secondary">
+                {{ __('Associate each Masternaut vehicle with a GLPI user. A suggestion comes from name matching and is not applied by itself: click it to fill the user, then save.', 'fleetview') }}
+                {{ __('An association only applies to the tickets of its entity (and of its child entities when enabled): on other tickets, the vehicle appears as not linked, without the technician name.', 'fleetview') }}
+                {{ __('The table is paginated: save the current page before moving to another one.', 'fleetview') }}
+            </p>
 
-    <div class="card">
-        <div class="card-header d-flex align-items-center">
-            <h3 class="card-title mb-0">
-                <i class="ti ti-car me-2"></i>
-                {{ __('Vehicle to technician associations', 'fleetview') }}
-            </h3>
-            <span id="fleetview-filter-count" class="badge bg-secondary-lt ms-auto"></span>
-        </div>
-        <div class="card-body">
-            {% if vehicles_error is not null %}
-                <div class="alert alert-warning" role="alert">{{ vehicles_error }}</div>
-            {% elseif vehicles is empty %}
-                <div class="alert alert-info" role="alert">
-                    {{ __('Configure and save the API access in the API tab to list the fleet vehicles.', 'fleetview') }}
-                </div>
-            {% else %}
-                <p class="text-secondary">
-                    {{ __('Associate each Masternaut vehicle with a GLPI user. Rows marked "suggestion" are pre-filled from name matching: save to confirm them.', 'fleetview') }}
-                </p>
+            <form method="post" action="{{ mappings_action }}" id="fleetview-mappings-form">
+                <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token() }}" />
+
+                {% set columns = {
+                    'name': __('Vehicle', 'fleetview'),
+                    'registration': __('Registration', 'fleetview'),
+                    'group': __('Group'),
+                    'type': __('Type'),
+                    'make_model': __('Make / model', 'fleetview'),
+                    'status_label': __('Status'),
+                    'state': 'User'|itemtype_name,
+                } %}
                 <div class="table-responsive">
                     <table class="table table-sm table-striped align-middle" id="fleetview-mappings-table">
                         <thead>
                             <tr>
-                                <th role="button" data-sort="name">{{ __('Vehicle', 'fleetview') }} <i class="ti"></i></th>
-                                <th role="button" data-sort="registration">{{ __('Registration', 'fleetview') }} <i class="ti"></i></th>
-                                <th role="button" data-sort="group">{{ __('Group') }} <i class="ti"></i></th>
-                                <th role="button" data-sort="type">{{ __('Type') }} <i class="ti"></i></th>
-                                <th role="button" data-sort="makemodel">{{ __('Make / model', 'fleetview') }} <i class="ti"></i></th>
-                                <th role="button" data-sort="status">{{ __('Status') }} <i class="ti"></i></th>
-                                <th role="button" data-sort="state" class="w-33">{{ 'User'|itemtype_name }} <i class="ti"></i></th>
+                                {% for key, label in columns %}
+                                    <th role="button" data-sort="{{ key }}" class="{{ key == 'state' ? 'w-25' : '' }}">
+                                        {{ label }}
+                                        <i class="ti {{ sort == key ? (order == 'DESC' ? 'ti-sort-descending' : 'ti-sort-ascending') : '' }}"></i>
+                                    </th>
+                                {% endfor %}
+                                <th class="w-25">{{ 'Entity'|itemtype_name }}</th>
+                                <th>{{ __('Child entities') }}</th>
                             </tr>
-                            <tr>
-                                <th><input type="text" class="form-control form-control-sm" data-filter="name" placeholder="{{ __('Filter…', 'fleetview') }}"></th>
-                                <th><input type="text" class="form-control form-control-sm" data-filter="registration" placeholder="{{ __('Filter…', 'fleetview') }}"></th>
+                            <tr id="fleetview-mappings-filters">
+                                <th><input type="text" class="form-control form-control-sm" name="filters[name]" value="{{ filters.name|default('') }}" placeholder="{{ __('Filter…', 'fleetview') }}"></th>
+                                <th><input type="text" class="form-control form-control-sm" name="filters[registration]" value="{{ filters.registration|default('') }}" placeholder="{{ __('Filter…', 'fleetview') }}"></th>
                                 <th>
-                                    <select class="form-select form-select-sm" data-filter-select="group">
+                                    <select class="form-select form-select-sm" name="filters[group]">
                                         <option value="">{{ __('All groups', 'fleetview') }}</option>
+                                        {% for value in choices.group %}
+                                            <option value="{{ value }}" {{ filters.group|default('') == value ? 'selected' : '' }}>{{ value }}</option>
+                                        {% endfor %}
                                     </select>
                                 </th>
                                 <th>
-                                    <select class="form-select form-select-sm" data-filter-select="type">
+                                    <select class="form-select form-select-sm" name="filters[type]">
                                         <option value="">{{ __('All types', 'fleetview') }}</option>
+                                        {% for value in choices.type %}
+                                            <option value="{{ value }}" {{ filters.type|default('') == value ? 'selected' : '' }}>{{ value }}</option>
+                                        {% endfor %}
                                     </select>
                                 </th>
-                                <th><input type="text" class="form-control form-control-sm" data-filter="makemodel" placeholder="{{ __('Filter…', 'fleetview') }}"></th>
+                                <th><input type="text" class="form-control form-control-sm" name="filters[make_model]" value="{{ filters.make_model|default('') }}" placeholder="{{ __('Filter…', 'fleetview') }}"></th>
                                 <th>
-                                    <select class="form-select form-select-sm" data-filter-select="status">
+                                    <select class="form-select form-select-sm" name="filters[status_label]">
                                         <option value="">{{ __('All', 'fleetview') }}</option>
+                                        {% for value in choices.status_label %}
+                                            <option value="{{ value }}" {{ filters.status_label|default('') == value ? 'selected' : '' }}>{{ value }}</option>
+                                        {% endfor %}
                                     </select>
                                 </th>
                                 <th>
-                                    <select class="form-select form-select-sm" data-filter-select="state">
+                                    <select class="form-select form-select-sm" name="filters[state]">
                                         <option value="">{{ __('All', 'fleetview') }}</option>
-                                        <option value="mapped">{{ __('Associated', 'fleetview') }}</option>
-                                        <option value="suggested">{{ __('Suggestion', 'fleetview') }}</option>
-                                        <option value="none">{{ __('Not associated', 'fleetview') }}</option>
+                                        <option value="mapped" {{ filters.state|default('') == 'mapped' ? 'selected' : '' }}>{{ __('Associated', 'fleetview') }}</option>
+                                        <option value="suggested" {{ filters.state|default('') == 'suggested' ? 'selected' : '' }}>{{ __('Suggestion', 'fleetview') }}</option>
+                                        <option value="none" {{ filters.state|default('') == 'none' ? 'selected' : '' }}>{{ __('Not associated', 'fleetview') }}</option>
                                     </select>
                                 </th>
+                                <th></th>
+                                <th></th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for vehicle in vehicles %}
-                                <tr data-name="{{ vehicle.name }}"
-                                    data-registration="{{ vehicle.registration }}"
-                                    data-group="{{ vehicle.group }}"
-                                    data-type="{{ vehicle.type }}"
-                                    data-makemodel="{{ vehicle.make_model }}"
-                                    data-status="{{ vehicle.status_label }}"
-                                    data-state="{{ vehicle.users_id > 0 ? 'mapped' : (vehicle.suggested_id > 0 ? 'suggested' : 'none') }}">
+                                <tr>
                                     <td>{{ vehicle.name }}</td>
                                     <td>{{ vehicle.registration }}</td>
                                     <td>{{ vehicle.group }}</td>
@@ -111,85 +131,151 @@
                                         <input type="hidden" name="labels[{{ vehicle.id }}]" value="{{ vehicle.name }}" />
                                         {% do call('User::dropdown', [{
                                             'name': 'mappings[' ~ vehicle.id ~ ']',
-                                            'value': vehicle.users_id > 0 ? vehicle.users_id : vehicle.suggested_id,
+                                            'value': vehicle.users_id,
                                             'right': 'all',
                                             'entity': -1,
                                             'width': '100%',
                                         }]) %}
-                                        {% if vehicle.users_id == 0 and vehicle.suggested_id > 0 %}
-                                            <span class="badge bg-yellow-lt ms-1">{{ __('suggestion', 'fleetview') }}</span>
+                                        {% if vehicle.state == 'suggested' %}
+                                            <button type="button" class="btn btn-sm btn-outline-warning mt-1 fleetview-apply-suggestion"
+                                                    data-users-id="{{ vehicle.suggested_id }}"
+                                                    data-name="{{ vehicle.suggested_name }}"
+                                                    title="{{ __('Fill the user with this suggestion', 'fleetview') }}">
+                                                <i class="ti ti-bulb me-1"></i>{{ __('Suggestion: %s', 'fleetview')|format(vehicle.suggested_name) }}
+                                            </button>
                                         {% endif %}
                                     </td>
+                                    <td>
+                                        {% do call('Entity::dropdown', [{
+                                            'name': 'entities[' ~ vehicle.id ~ ']',
+                                            'value': vehicle.entities_id,
+                                            'entity': active_entities,
+                                            'width': '100%',
+                                        }]) %}
+                                    </td>
+                                    <td class="text-center">
+                                        <input type="hidden" name="recursive[{{ vehicle.id }}]" value="0" />
+                                        <input type="checkbox" class="form-check-input" name="recursive[{{ vehicle.id }}]" value="1" {{ vehicle.is_recursive ? 'checked' : '' }} />
+                                    </td>
+                                </tr>
+                            {% else %}
+                                <tr>
+                                    <td colspan="9" class="text-center text-secondary">{{ __('No vehicle matches the filters.', 'fleetview') }}</td>
                                 </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                 </div>
 
-                <script>
-                (() => {
-                    const table = document.getElementById('fleetview-mappings-table');
-                    const tbody = table.querySelector('tbody');
-                    const rows  = () => [...tbody.querySelectorAll('tr')];
-                    const count = document.getElementById('fleetview-filter-count');
+                {% if total > 0 %}
+                    {# Search-list pager (page numbers, rows per page), reloading the tab #}
+                    <div id="fleetview-mappings-pager" class="mt-3">
+                        {{ include('components/pager.html.twig', {
+                            'count': total,
+                            'start': start,
+                            'limit': limit,
+                            'is_tab': true,
+                            'additional_params': reload_params,
+                        }) }}
+                    </div>
+                {% endif %}
 
-                    // Feed the group/type filter dropdowns with existing values
-                    for (const key of ['group', 'type', 'status']) {
-                        const select = table.querySelector(`[data-filter-select="${key}"]`);
-                        const values = [...new Set(rows().map((r) => r.dataset[key]).filter(Boolean))]
-                            .sort((a, b) => a.localeCompare(b));
-                        for (const value of values) {
-                            select.add(new Option(value, value));
-                        }
+                {% if vehicles is not empty %}
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="ti ti-device-floppy me-1"></i>
+                            {{ __('Save') }}
+                        </button>
+                    </div>
+                {% endif %}
+            </form>
+
+            <script>
+            (() => {
+                const form  = document.getElementById('fleetview-mappings-form');
+                const table = document.getElementById('fleetview-mappings-table');
+                const pager = document.getElementById('fleetview-mappings-pager');
+                const currentSort  = {{ sort|json_encode|raw }};
+                const currentOrder = {{ order|json_encode|raw }};
+
+                // Edits are lost by a tab reload (filter, sort, page): ask first
+                let dirty = false;
+                form.addEventListener('change', (event) => {
+                    if (!event.target.closest('#fleetview-mappings-filters, #fleetview-mappings-pager')) {
+                        dirty = true;
                     }
+                });
+                const confirmReload = () => !dirty || window.confirm({{ __('Unsaved changes on this page will be lost. Continue?', 'fleetview')|json_encode|raw }});
 
-                    const applyFilters = () => {
-                        const texts = [...table.querySelectorAll('[data-filter]')]
-                            .map((i) => [i.dataset.filter, i.value.trim().toLowerCase()]);
-                        const selects = [...table.querySelectorAll('[data-filter-select]')]
-                            .map((s) => [s.dataset.filterSelect, s.value]);
+                // Filters, sort and page travel together through reloadTab()
+                const filterParams = () => new URLSearchParams(new FormData(form)).toString()
+                    .split('&').filter((p) => p.startsWith('filters%5B')).join('&');
+                const reload = (extra) => {
+                    if (confirmReload()) {
+                        reloadTab([filterParams(), extra].filter(Boolean).join('&'));
+                    }
+                };
 
-                        let visible = 0;
-                        for (const row of rows()) {
-                            const matches = texts.every(([key, value]) => value === '' || row.dataset[key].toLowerCase().includes(value))
-                                && selects.every(([key, value]) => value === '' || row.dataset[key] === value);
-                            row.classList.toggle('d-none', !matches);
-                            visible += matches ? 1 : 0;
+                const filters = table.querySelector('#fleetview-mappings-filters');
+                let timer = null;
+                filters.querySelectorAll('input[type="text"]').forEach((input) => {
+                    input.addEventListener('keydown', (event) => {
+                        if (event.key === 'Enter') {
+                            event.preventDefault();
+                            clearTimeout(timer);
+                            reload(`sort=${currentSort}&order=${currentOrder}`);
                         }
-                        count.textContent = `${visible} / ${rows().length}`;
-                    };
+                    });
+                    input.addEventListener('input', () => {
+                        clearTimeout(timer);
+                        timer = setTimeout(() => reload(`sort=${currentSort}&order=${currentOrder}`), 500);
+                    });
+                });
+                filters.querySelectorAll('select').forEach((select) => {
+                    select.addEventListener('change', () => reload(`sort=${currentSort}&order=${currentOrder}`));
+                });
 
-                    table.querySelectorAll('[data-filter]').forEach((i) => i.addEventListener('input', applyFilters));
-                    table.querySelectorAll('[data-filter-select]').forEach((s) => s.addEventListener('change', applyFilters));
+                // Click on a header to sort (toggles asc/desc)
+                table.querySelectorAll('th[data-sort]').forEach((th) => th.addEventListener('click', () => {
+                    const key   = th.dataset.sort;
+                    const order = currentSort === key && currentOrder === 'ASC' ? 'DESC' : 'ASC';
+                    reload(`sort=${key}&order=${order}`);
+                }));
 
-                    // Click on a header to sort (toggles asc/desc)
-                    let sortKey = null;
-                    let sortAsc = true;
-                    table.querySelectorAll('th[data-sort]').forEach((th) => th.addEventListener('click', () => {
-                        const key = th.dataset.sort;
-                        sortAsc = sortKey === key ? !sortAsc : true;
-                        sortKey = key;
+                // Pager links and list limit call reloadTab() themselves:
+                // intercept them first when there are unsaved edits
+                for (const type of ['click', 'change']) {
+                    pager.addEventListener(type, (event) => {
+                        if ((type === 'click' && !event.target.closest('a')) || (type === 'change' && !event.target.matches('select'))) {
+                            return;
+                        }
+                        if (!confirmReload()) {
+                            event.preventDefault();
+                            event.stopPropagation();
+                        }
+                    }, true);
+                }
 
-                        table.querySelectorAll('th[data-sort] i.ti').forEach((i) => { i.className = 'ti'; });
-                        th.querySelector('i.ti').className = sortAsc ? 'ti ti-sort-ascending' : 'ti ti-sort-descending';
-
-                        rows()
-                            .sort((a, b) => a.dataset[key].localeCompare(b.dataset[key], undefined, { numeric: true, sensitivity: 'base' }) * (sortAsc ? 1 : -1))
-                            .forEach((row) => tbody.appendChild(row));
-                    }));
-
-                    applyFilters();
-                })();
-                </script>
-            {% endif %}
-        </div>
-        {% if vehicles is not empty %}
-            <div class="card-footer">
-                <button type="submit" class="btn btn-primary">
-                    <i class="ti ti-device-floppy me-1"></i>
-                    {{ __('Save') }}
-                </button>
-            </div>
+                // A suggestion only fills the user dropdown when clicked
+                // (select2 with remote data: the option is added by hand);
+                // it is saved with the form, like any other choice
+                table.querySelector('tbody').addEventListener('click', (event) => {
+                    const button = event.target.closest('.fleetview-apply-suggestion');
+                    if (!button) {
+                        return;
+                    }
+                    const select = button.closest('tr').querySelector('select[name^="mappings["]');
+                    if (!select) {
+                        return;
+                    }
+                    if (![...select.options].some((o) => o.value === button.dataset.usersId)) {
+                        select.add(new Option(button.dataset.name, button.dataset.usersId));
+                    }
+                    $(select).val(button.dataset.usersId).trigger('change');
+                    button.remove();
+                });
+            })();
+            </script>
         {% endif %}
     </div>
-</form>
+</div>

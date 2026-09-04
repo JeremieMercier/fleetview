@@ -170,14 +170,17 @@
         }
     };
 
-    // Radius choices offered in the modal (km); the configured radius is
+    // Radius choices offered in the modal (km), limited to the configured
+    // radius (the server refuses anything wider); the configured radius is
     // inserted on first load if missing. Keep in sync with PluginConfig.
     const RADIUS_CHOICES = [25, 50, 75, 100, 125, 150, 175, 200, 250, 300, 400, 500];
 
-    const syncRadiusSelect = (radiusKm) => {
+    const syncRadiusSelect = (radiusKm, maxRadiusKm) => {
         const select = document.getElementById('fleetview-radius');
         if (select.options.length === 0) {
-            const choices = [...new Set([...RADIUS_CHOICES, Math.round(radiusKm)])].sort((a, b) => a - b);
+            const choices = [...new Set([...RADIUS_CHOICES, Math.round(radiusKm), Math.round(maxRadiusKm)])]
+                .filter((km) => km <= Math.round(maxRadiusKm))
+                .sort((a, b) => a - b);
             for (const km of choices) {
                 select.add(new Option(`${km} km`, km));
             }
@@ -419,7 +422,7 @@
                 return;
             }
 
-            syncRadiusSelect(data.radius_km);
+            syncRadiusSelect(data.radius_km, data.radius_max_km);
             syncUnlinkedToggle(data.show_unlinked);
             updateLegend(data.marker_colors);
 

@@ -45,6 +45,7 @@ use GlpiPlugin\Fleetview\TechnicianAgenda;
 use GlpiPlugin\Fleetview\TechnicianMatcher;
 use GlpiPlugin\Fleetview\VehicleMapping;
 use Location;
+use Profile_User;
 use Safe\Exceptions\JsonException;
 use Ticket_User;
 use User;
@@ -129,11 +130,16 @@ final class MapController extends AbstractController
 
         $config = PluginConfig::getConfig();
 
-        // Optional radius override from the modal selector
-        $radius = $request->query->get('radius');
-        if (is_numeric($radius)) {
-            $config['search_radius'] = (string) min(500, max(1, (int) $radius));
+        // Optional radius override from the modal selector, bounded by the
+        // configured maximum radius (the configured radius is the default
+        // of the selector, the maximum is the widest search allowed).
+        $max_radius = min(500, max(1, (int) $config['search_radius_max']));
+        $radius     = $request->query->get('radius');
+        if (!is_numeric($radius)) {
+            $radius = $config['search_radius'];
         }
+
+        $config['search_radius'] = (string) min($max_radius, max(1, (int) $radius));
 
         // Optional override of the unlinked vehicles toggle from the modal
         // (the configured value is its default state)
@@ -149,11 +155,12 @@ final class MapController extends AbstractController
         }
 
         // Link vehicles to GLPI users: explicit associations first, optional
-        // name matching as fallback. The link drives the unlinked vehicles
-        // filter and the planned interventions of the popup; the assignment
-        // button additionally needs the right.
-        $mappings = VehicleMapping::getMap();
-        $matcher  = $config['name_matching_fallback'] ? new TechnicianMatcher() : null;
+        // name matching as fallback, both limited to the ticket entity (the
+        // fleet is global, the technician identities are not). The link
+        // drives the unlinked vehicles filter and the planned interventions
+        // of the popup; the assignment button additionally needs the right.
+        $mappings = VehicleMapping::getMap($ticket->getEntityID());
+        $matcher  = $config['name_matching_fallback'] ? new TechnicianMatcher(null, $ticket->getEntityID()) : null;
 
         try {
             $vehicles = $client->getNearbyVehicles(
@@ -246,6 +253,7 @@ final class MapController extends AbstractController
             'configured'    => true,
             'can_assign'    => $can_assign,
             'radius_km'     => (float) $config['search_radius'],
+            'radius_max_km' => (float) $max_radius,
             'max_tasks'     => $max_tasks,
             'with_events'   => $with_events,
             'title_source'  => $config['popup_title_source'] === 'technician' ? 'technician' : 'vehicle',
@@ -296,6 +304,17 @@ final class MapController extends AbstractController
             return new JsonResponse(['error' => __('User not found', 'fleetview')], Response::HTTP_BAD_REQUEST);
         }
 
+        // The assignee is not taken on trust from the request: it must be
+        // one of the technicians the map may offer for this ticket, and be
+        // allowed to take tickets in its entity, as the native actor
+        // dropdown requires ("own ticket" right, entity restricted).
+        if (!in_array($users_id, $this->getAssignableTechnicians($ticket), true)) {
+            return new JsonResponse(
+                ['error' => __('This technician cannot be assigned from the map.', 'fleetview')],
+                Response::HTTP_FORBIDDEN,
+            );
+        }
+
         $ticket_user = new Ticket_User();
         $already = $ticket_user->getFromDBByCrit([
             'tickets_id' => $id,
@@ -334,6 +353,56 @@ final class MapController extends AbstractController
             ['error' => __('You are not allowed to view the fleet map.', 'fleetview')],
             Response::HTTP_FORBIDDEN,
         );
+    }
+
+    /**
+     * Technicians the map may offer for the ticket: users linked to a fleet
+     * vehicle (explicit association, or name matching of the vehicles the
+     * map can display around the ticket when the fallback is enabled),
+     * restricted to those holding the "own ticket" right in the ticket
+     * entity. The eligibility of the assignee is decided here, server-side.
+     *
+     * @return list<int>
+     */
+    private function getAssignableTechnicians(Ticket $ticket): array
+    {
+        $config     = PluginConfig::getConfig();
+        $mappings   = VehicleMapping::getMap($ticket->getEntityID());
+        $candidates = array_values(array_unique(array_values($mappings)));
+
+        $location = $this->getTicketLocation($ticket);
+        if ($config['name_matching_fallback'] && $location !== null) {
+            // Widest search the modal allows, so that every vehicle it may
+            // have displayed is considered (positions are cached)
+            $config['search_radius'] = $config['search_radius_max'];
+            $client = $this->buildMasternautClient($config);
+            if ($client->isConfigured()) {
+                $matcher = new TechnicianMatcher(null, $ticket->getEntityID());
+                try {
+                    foreach ($client->getNearbyVehicles($location['latitude'], $location['longitude']) as $vehicle) {
+                        $users_id = $this->resolveTechnician($vehicle, $mappings, $matcher);
+                        if ($users_id !== null) {
+                            $candidates[] = $users_id;
+                        }
+                    }
+                } catch (MasternautApiException) {
+                    // No name-matched candidate when the fleet is unreachable
+                }
+            }
+        }
+
+        $entities_id = $ticket->getEntityID();
+        $assignable  = [];
+        foreach (array_unique($candidates) as $users_id) {
+            foreach (Profile_User::getUserEntitiesForRight($users_id, Ticket::$rightname, Ticket::OWN) as $entity) {
+                if (is_numeric($entity) && (int) $entity === $entities_id) {
+                    $assignable[] = $users_id;
+                    break;
+                }
+            }
+        }
+
+        return $assignable;
     }
 
     /**

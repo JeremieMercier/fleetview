@@ -110,7 +110,9 @@ final class Profile extends CommonGLPI
      * Register the right (idempotent, also runs on plugin update). On first
      * registration, profiles allowed to assign tickets (to others or to
      * themselves) get the read right: technicians and dispatchers keep the
-     * map, requesters never had the button.
+     * map, requesters never had the button. Out of the box, that is every
+     * central profile but Read-Only, Observer included (it may take tickets
+     * on its own); the administrator is invited to review the grant.
      */
     public static function install(): void
     {

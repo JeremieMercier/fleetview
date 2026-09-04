@@ -47,7 +47,16 @@
                 'search_radius',
                 config['search_radius'],
                 radius_choices,
-                __('Search radius (km)', 'fleetview')
+                __('Search radius (km)', 'fleetview'),
+                {'helper': __('Default value of the radius selector of the map.', 'fleetview')}
+            ) }}
+
+            {{ fields.dropdownArrayField(
+                'search_radius_max',
+                config['search_radius_max'],
+                radius_choices,
+                __('Maximum search radius (km)', 'fleetview'),
+                {'helper': __('Widest search a user can select on the map.', 'fleetview')}
             ) }}
 
             {{ fields.numberField(

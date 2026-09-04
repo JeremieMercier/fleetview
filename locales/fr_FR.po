@@ -69,6 +69,18 @@ msgstr "Laisser vide pour conserver le secret actuel"
 msgid "Search radius (km)"
 msgstr "Rayon de recherche (km)"
 
+#: templates/config_display.html.twig
+msgid "Default value of the radius selector of the map."
+msgstr "Valeur par défaut du sélecteur de rayon de la carte."
+
+#: templates/config_display.html.twig
+msgid "Maximum search radius (km)"
+msgstr "Rayon de recherche maximal (km)"
+
+#: templates/config_display.html.twig
+msgid "Widest search a user can select on the map."
+msgstr "Recherche la plus large qu'un utilisateur peut sélectionner sur la carte."
+
 #: templates/config.html.twig
 msgid "Maximum number of vehicles displayed"
 msgstr "Nombre maximum de véhicules affichés"
@@ -110,9 +122,13 @@ msgstr "Impossible de récupérer les positions des véhicules."
 msgid "Routing service URL (OSRM)"
 msgstr "URL du service d'itinéraires (OSRM)"
 
-#: templates/config.html.twig
-msgid "Used to estimate driving times; coordinates are sent to this service. Leave empty to disable."
-msgstr "Utilisé pour estimer les temps de route ; les coordonnées sont envoyées à ce service. Laisser vide pour désactiver."
+#: templates/config_api.html.twig
+msgid "Driving times and road routes. The ticket site and vehicle coordinates are sent to this service on every map opening: prefer a self-hosted server. Empty (default) = disabled, the map still works without it."
+msgstr "Temps de trajet et itinéraires routiers. Les coordonnées du lieu du ticket et des véhicules sont envoyées à ce service à chaque ouverture de la carte : préférez un serveur auto-hébergé. Vide (par défaut) = désactivé, la carte fonctionne sans."
+
+#: templates/config_api.html.twig
+msgid "The routing service is hosted by a third party: the GPS coordinates of the ticket site and of the displayed vehicles are sent to it on every map opening, without any name or identifier, along with the IP address of your server. Make sure this transfer suits you, or self-host the service (see the README)."
+msgstr "Le service de routage est hébergé par un tiers : les coordonnées GPS du lieu du ticket et des véhicules affichés lui sont transmises à chaque ouverture de la carte, sans nom ni identifiant, avec l'adresse IP de votre serveur. Assurez-vous que ce transfert vous convient, ou auto-hébergez le service (voir le README)."
 
 #: public/js/fleetview.js
 msgid "approx. %1 drive (%2 km by road)"
@@ -189,6 +205,10 @@ msgstr "Ticket introuvable"
 msgid "User not found"
 msgstr "Utilisateur introuvable"
 
+#: src/Controller/MapController.php
+msgid "This technician cannot be assigned from the map."
+msgstr "Ce technicien ne peut pas être attribué depuis la carte."
+
 #: templates/config.html.twig
 msgid "Match technicians by name when a vehicle has no association"
 msgstr "Faire correspondre les techniciens par nom quand un véhicule n'a pas d'association"
@@ -205,9 +225,33 @@ msgstr "Associations véhicules / techniciens"
 msgid "Configure and save the API access in the API tab to list the fleet vehicles."
 msgstr "Configurez et enregistrez l'accès API dans l'onglet API pour lister les véhicules de la flotte."
 
-#: templates/config.html.twig
-msgid "Associate each Masternaut vehicle with a GLPI user. Rows marked \"suggestion\" are pre-filled from name matching: save to confirm them."
-msgstr "Associez chaque véhicule Masternaut à un utilisateur GLPI. Les lignes marquées « suggestion » sont préremplies par correspondance de nom : enregistrez pour les confirmer."
+#: templates/config_mappings.html.twig
+msgid "Associate each Masternaut vehicle with a GLPI user. A suggestion comes from name matching and is not applied by itself: click it to fill the user, then save."
+msgstr "Associez chaque véhicule Masternaut à un utilisateur GLPI. Une suggestion provient de la correspondance par nom et ne s'applique pas d'elle-même : cliquez dessus pour remplir l'utilisateur, puis enregistrez."
+
+#: templates/config_mappings.html.twig
+msgid "Fill the user with this suggestion"
+msgstr "Remplir l'utilisateur avec cette suggestion"
+
+#: templates/config_mappings.html.twig
+msgid "Suggestion: %s"
+msgstr "Suggestion : %s"
+
+#: templates/config_mappings.html.twig
+msgid "The table is paginated: save the current page before moving to another one."
+msgstr "Le tableau est paginé : enregistrez la page en cours avant de passer à une autre."
+
+#: templates/config_mappings.html.twig
+msgid "No vehicle matches the filters."
+msgstr "Aucun véhicule ne correspond aux filtres."
+
+#: templates/config_mappings.html.twig
+msgid "Unsaved changes on this page will be lost. Continue?"
+msgstr "Les modifications non enregistrées de cette page seront perdues. Continuer ?"
+
+#: templates/config_mappings.html.twig
+msgid "An association only applies to the tickets of its entity (and of its child entities when enabled): on other tickets, the vehicle appears as not linked, without the technician name."
+msgstr "Une association ne s'applique qu'aux tickets de son entité (et de ses sous-entités si l'option est cochée) : sur les autres tickets, le véhicule apparaît comme non associé, sans le nom du technicien."
 
 #: templates/config.html.twig
 msgid "Vehicle"
@@ -216,10 +260,6 @@ msgstr "Véhicule"
 #: templates/config.html.twig
 msgid "Registration"
 msgstr "Immatriculation"
-
-#: templates/config.html.twig
-msgid "suggestion"
-msgstr "suggestion"
 
 #: src/Controller/MappingController.php
 msgid "Vehicle associations have been saved."

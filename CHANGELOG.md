@@ -7,6 +7,81 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-04
+
+### Added
+
+- The vehicle to technician associations table is paginated (GLPI "number
+  of items per page" preference, standard pager), with its filters and sort
+  handled server-side on the whole fleet: only one page of rows, each
+  carrying two dropdowns, is rendered, which keeps the tab fast on large
+  fleets. Associations are saved page by page.
+- Entity (with the "child entities" flag) on each vehicle to technician
+  association, in the associations tab: an association is only taken into
+  account for the tickets of its entity. Existing associations are attached to the root
+  entity with child entities enabled on update, which keeps the previous
+  behaviour.
+- "Maximum search radius" setting, the upper limit of the radius selector of
+  the map (150 km by default, 500 km at most: the provider limit). The
+  existing "Search radius" setting is documented as what it always was: the
+  default value of the selector. Existing installations get the 150 km
+  limit on update: raise it in the display settings if the map users need a
+  wider search.
+
+### Changed
+
+- The routing service (driving times, road routes) is disabled by default:
+  the URL of the public OSRM demo server was the default value, so the GPS
+  coordinates of the ticket sites and of the vehicles (coordinates only, no
+  identifier) were sent to a third party from the first map opening, without
+  an explicit decision. Enabling it is
+  now the administrator's choice; the configuration form warns when the URL
+  points outside the organisation network. Existing installations keep
+  their configured URL (marketplace security review of 0.5.0,
+  [#12](https://github.com/JeremieMercier/fleetview/issues/12)).
+
+### Fixed
+
+- Name-matching suggestions of the associations tab are no longer applied
+  by themselves: the user dropdown of a suggested row stays empty and the
+  suggestion is a button filling it, so saving the tab (for other rows)
+  does not silently turn every suggestion into an association.
+
+### Security
+
+- The GLPI identity of the vehicle technicians (association, name matching,
+  displayed name, assignment) is scoped to the entity of the ticket, as the
+  native actor dropdown: the associations were global and the name matching
+  considered every active user, so a technician of one entity could follow
+  the live positions of the named technicians of unrelated entities. The fleet itself stays global
+  (one Masternaut account): out of reach, a vehicle is "not linked", without
+  name, and hidden by default (marketplace security review of 0.5.0,
+  [#12](https://github.com/JeremieMercier/fleetview/issues/12)).
+- The assignment from the map only accepts the technicians the map may
+  offer for the ticket (linked to a vehicle, holding the "own ticket" right
+  in the ticket entity, as the native actor dropdown requires): the assignee
+  was taken from the request and only checked as an existing active user,
+  so any active account (another entity, a service account...) could be
+  assigned and notified (marketplace security review of 0.5.0,
+  [#12](https://github.com/JeremieMercier/fleetview/issues/12)).
+- The planned tasks of the marker popup follow the ticket read rights of the
+  user (see all / see group / see mine / see assigned...), as the GLPI
+  planning does, and need a task right: a profile allowed to see all
+  plannings but not all tickets could read the numbers and titles of tickets
+  it may not open (marketplace security review of 0.5.0,
+  [#12](https://github.com/JeremieMercier/fleetview/issues/12)).
+- The profiles granted the map right on install are documented and pinned by
+  a test: with stock GLPI profiles, Observer and Supervisor are granted too,
+  as they may assign tickets (Observer to itself), which the documentation
+  did not list. The administrator is invited to review the grant after the
+  installation (marketplace security review of 0.5.0,
+  [#12](https://github.com/JeremieMercier/fleetview/issues/12)).
+- The radius selector of the map is bounded by the new maximum radius
+  setting: the configured radius was only a default, any map user could
+  widen the search to the provider maximum of 500 km whatever the
+  administrator intended (GLPI marketplace security review of 0.5.0,
+  [#12](https://github.com/JeremieMercier/fleetview/issues/12)).
+
 ## [0.5.0] - 2026-09-02
 
 ### Added
@@ -97,7 +172,8 @@ First tagged release.
 - Unit and functional tests, GLPI quality tooling (php-cs-fixer, phpstan,
   rector, lints).
 
-[Unreleased]: https://github.com/JeremieMercier/fleetview/compare/0.5.0...HEAD
+[Unreleased]: https://github.com/JeremieMercier/fleetview/compare/0.6.0...HEAD
+[0.6.0]: https://github.com/JeremieMercier/fleetview/compare/0.5.0...0.6.0
 [0.5.0]: https://github.com/JeremieMercier/fleetview/compare/0.4.0...0.5.0
 [0.4.0]: https://github.com/JeremieMercier/fleetview/compare/0.3.0...0.4.0
 [0.3.0]: https://github.com/JeremieMercier/fleetview/compare/0.2.13...0.3.0

@@ -57,10 +57,15 @@ final class ProfileTest extends DbTestCase
         // set according to its ticket assignment right
         $this->assertArrayHasKey(Profile::RIGHTNAME, ProfileRight::getAllPossibleRights());
 
-        // Assign to others (Super-Admin, Hotliner) or to themselves (Technician)
+        // Assign to others (Super-Admin, Admin, Supervisor, Hotliner) or to
+        // themselves (Technician, and Observer: it carries the "own ticket"
+        // right out of the box, so it is deliberately part of the grant)
         $this->assertSame(READ, $this->rightOf('Super-Admin'));
+        $this->assertSame(READ, $this->rightOf('Admin'));
+        $this->assertSame(READ, $this->rightOf('Supervisor'));
         $this->assertSame(READ, $this->rightOf('Hotliner'));
         $this->assertSame(READ, $this->rightOf('Technician'));
+        $this->assertSame(READ, $this->rightOf('Observer'));
         $this->assertSame(0, $this->rightOf('Self-Service'));
         $this->assertSame(0, $this->rightOf('Read-Only'));
     }

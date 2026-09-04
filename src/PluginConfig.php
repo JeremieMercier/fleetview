@@ -40,10 +40,12 @@ use GLPIKey;
 use GlpiPlugin\Fleetview\Masternaut\MasternautApiException;
 use GlpiPlugin\Fleetview\Masternaut\MasternautClient;
 use Safe\Exceptions\JsonException;
+use Safe\Exceptions\UrlException;
 use Session;
 
 use function Safe\json_decode;
 use function Safe\json_encode;
+use function Safe\parse_url;
 
 /**
  * Plugin configuration, stored in the `glpi_configs` table under the
@@ -84,7 +86,8 @@ final class PluginConfig extends CommonGLPI
             'customer_id'    => '',    // Connect customer number, part of endpoint URLs
             'api_username'   => '',    // Connect Partner user (HTTP Basic auth)
             'api_secret'     => '',
-            'search_radius'  => '50',  // km around the ticket location (API max: 500)
+            'search_radius'  => '50',  // km around the ticket location, default of the map selector
+            'search_radius_max' => '150', // km, upper limit of the map selector (API max: 500)
             'max_results'    => '10',  // maximum number of vehicles returned
             'cache_lifetime' => '60',  // seconds, positions cache (API limit: 1 req/15s)
             // Restrict the vehicles shown in the map modal; empty = no filter,
@@ -92,8 +95,10 @@ final class PluginConfig extends CommonGLPI
             'modal_group'  => '',      // Masternaut group names
             'modal_status' => '',      // IN_CIRCULATION / IN_MAINTENANCE / SOLD
             // OSRM-compatible routing service for driving time estimations.
-            // Coordinates are sent to this third-party service; empty = disabled.
-            'routing_base_url' => 'https://router.project-osrm.org',
+            // Coordinates (ticket site, vehicles) are sent to this service:
+            // opt-in, empty = disabled. The public demo server
+            // (https://router.project-osrm.org) may be entered explicitly.
+            'routing_base_url' => '',
             // Fall back on name matching (vehicle/driver name vs GLPI users)
             // when a vehicle has no explicit association. Off by default:
             // it only makes sense when vehicles are named after technicians.
@@ -231,9 +236,47 @@ final class PluginConfig extends CommonGLPI
         $config['api_secret'] = '';
 
         TemplateRenderer::getInstance()->display('@fleetview/config_api.html.twig', [
-            'config'      => $config,
-            'form_action' => self::getRootDoc() . '/plugins/fleetview/config',
+            'config'           => $config,
+            'form_action'      => self::getRootDoc() . '/plugins/fleetview/config',
+            'routing_external' => self::isExternalHost($config['routing_base_url']),
         ]);
+    }
+
+    /**
+     * Whether a service URL points outside the organisation network:
+     * anything but the loopback, the private IP ranges and hostnames
+     * without a public domain. Used to warn about location data sent to a
+     * third party.
+     */
+    public static function isExternalHost(string $url): bool
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return false;
+        }
+
+        try {
+            $host = parse_url($url, PHP_URL_HOST);
+        } catch (UrlException) {
+            return false;
+        }
+
+        if (!is_string($host) || $host === '') {
+            return false;
+        }
+
+        $host = strtolower(trim($host, '[]'));
+        if ($host === 'localhost' || str_ends_with($host, '.localhost') || str_ends_with($host, '.local')) {
+            return false;
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
+            // Public IP: external; loopback, private and link-local: internal
+            return filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false;
+        }
+
+        // Bare hostname (no domain): the local network
+        return str_contains($host, '.');
     }
 
     /**
@@ -288,10 +331,11 @@ final class PluginConfig extends CommonGLPI
         $config = self::getConfig();
 
         // Same radius choices as the modal selector (keep in sync with
-        // RADIUS_CHOICES in fleetview.js); the current value stays
-        // selectable even if it is not part of the presets
+        // RADIUS_CHOICES in fleetview.js); the current values stay
+        // selectable even if they are not part of the presets
         $radius_choices = [25, 50, 75, 100, 125, 150, 175, 200, 250, 300, 400, 500];
         $radius_choices[] = (int) $config['search_radius'];
+        $radius_choices[] = (int) $config['search_radius_max'];
         $radius_choices = array_unique($radius_choices);
         sort($radius_choices);
         $radius_choices = array_combine(
@@ -345,19 +389,24 @@ final class PluginConfig extends CommonGLPI
         $config = self::getConfig();
 
         // Vehicle to user associations, with name-matching suggestions for
-        // vehicles that are not associated yet.
-        $vehicles       = [];
+        // vehicles that are not associated yet. The whole (cached) fleet is
+        // filtered and sorted server-side, one page of it is rendered.
+        $rows           = [];
         $vehicles_error = null;
         $client         = new MasternautClient($config);
         if ($client->isConfigured()) {
             try {
-                $mappings = VehicleMapping::getMap();
+                // Every association, whatever its entity: the screen manages
+                // them all (new ones default to the active entity, with
+                // child entities enabled)
+                $mappings = VehicleMapping::getAll();
                 $matcher  = new TechnicianMatcher();
                 foreach ($client->getVehicles() as $vehicle) {
-                    $users_id = $mappings[$vehicle['id']] ?? 0;
-                    $vehicle['status_label'] = self::getStatusLabel($vehicle['status']);
-                    $vehicles[] = $vehicle + [
+                    $users_id = $mappings[$vehicle['id']]['users_id'] ?? 0;
+                    $rows[]   = $vehicle + [
+                        'status_label' => self::getStatusLabel($vehicle['status']),
                         'users_id'     => $users_id,
+                        // Only offered: never saved unless applied explicitly
                         'suggested_id' => $users_id === 0 ? ($matcher->match($vehicle['name']) ?? 0) : 0,
                     ];
                 }
@@ -366,10 +415,57 @@ final class PluginConfig extends CommonGLPI
             }
         }
 
+        // Filters, sort and page come from the tab reload parameters
+        $filters = MappingsTable::filters($_GET['filters'] ?? null);
+        $limit   = is_numeric($_SESSION['glpilist_limit'] ?? null) ? max(1, (int) $_SESSION['glpilist_limit']) : 20;
+        $page    = MappingsTable::page(
+            $rows,
+            $filters,
+            is_string($_GET['sort'] ?? null) ? $_GET['sort'] : '',
+            is_string($_GET['order'] ?? null) ? $_GET['order'] : '',
+            is_numeric($_GET['start'] ?? null) ? (int) $_GET['start'] : 0,
+            $limit,
+        );
+
+        $vehicles = [];
+        foreach ($page['rows'] as $row) {
+            $mapping    = $mappings[$row['id']] ?? null;
+            $vehicles[] = $row + [
+                'state'          => MappingsTable::state($row),
+                'suggested_name' => $row['suggested_id'] > 0 ? getUserName($row['suggested_id']) : '',
+                'entities_id'    => $mapping['entities_id'] ?? Session::getActiveEntity(),
+                'is_recursive'   => $mapping['is_recursive'] ?? true,
+            ];
+        }
+
+        $active_entities = [];
+        foreach ((array) ($_SESSION['glpiactiveentities'] ?? []) as $entities_id) {
+            if (is_numeric($entities_id)) {
+                $active_entities[] = (int) $entities_id;
+            }
+        }
+
+        // Filters and sort travel with every pager link / tab reload
+        $reload_params = http_build_query([
+            'filters' => $filters,
+            'sort'    => $page['sort'],
+            'order'   => $page['order'],
+        ]);
+
         TemplateRenderer::getInstance()->display('@fleetview/config_mappings.html.twig', [
             'vehicles'        => $vehicles,
             'vehicles_error'  => $vehicles_error,
+            'fleet_size'      => count($rows),
+            'total'           => $page['total'],
+            'filters'         => $filters,
+            'choices'         => MappingsTable::choices($rows),
+            'sort'            => $page['sort'],
+            'order'           => $page['order'],
+            'reload_params'   => $reload_params,
+            'start'           => $page['start'],
+            'limit'           => $limit,
             'mappings_action' => self::getRootDoc() . '/plugins/fleetview/mappings',
+            'active_entities' => $active_entities,
         ]);
     }
 
