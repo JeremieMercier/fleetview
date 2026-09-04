@@ -120,8 +120,12 @@ msgstr ""
 msgid "Routing service URL (OSRM)"
 msgstr ""
 
-#: templates/config.html.twig
-msgid "Used to estimate driving times; coordinates are sent to this service. Leave empty to disable."
+#: templates/config_api.html.twig
+msgid "Driving times and road routes. The ticket site and vehicle coordinates are sent to this service on every map opening: prefer a self-hosted server. Empty (default) = disabled, the map still works without it."
+msgstr ""
+
+#: templates/config_api.html.twig
+msgid "The routing service is hosted by a third party: the GPS coordinates of the ticket site and of the displayed vehicles are sent to it on every map opening, without any name or identifier, along with the IP address of your server. Make sure this transfer suits you, or self-host the service (see the README)."
 msgstr ""
 
 #: public/js/fleetview.js

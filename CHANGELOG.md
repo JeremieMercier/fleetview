@@ -16,6 +16,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   limit on update: raise it in the display settings if the map users need a
   wider search.
 
+### Changed
+
+- The routing service (driving times, road routes) is disabled by default:
+  the URL of the public OSRM demo server was the default value, so the GPS
+  coordinates of the ticket sites and of the vehicles (coordinates only, no
+  identifier) were sent to a third party from the first map opening, without
+  an explicit decision. Enabling it is
+  now the administrator's choice; the configuration form warns when the URL
+  points outside the organisation network. Existing installations keep
+  their configured URL (marketplace security review of 0.5.0,
+  [#12](https://github.com/JeremieMercier/fleetview/issues/12)).
+
 ### Security
 
 - The planned tasks of the marker popup follow the ticket read rights of the

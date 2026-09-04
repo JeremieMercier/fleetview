@@ -125,6 +125,9 @@ recherche (valeur par défaut du sélecteur de la carte) et rayon maximal
 véhicules et durée du cache. Le secret est chiffré en
 base via GLPIKey (hook `secured_configs`) et n'apparaît jamais dans le dépôt.
 
+Le service de routage (temps de trajet, itinéraires) est désactivé par
+défaut : voir la section dédiée ci-dessous avant de renseigner son URL.
+
 Onglet *Affichage* : couleurs des marqueurs, filtres, titre de la bulle (nom
 du technicien GLPI associé ou nom du véhicule Masternaut), affichage de la
 plaque d'immatriculation, tracé des itinéraires, nombre d'entrées du planning
@@ -175,11 +178,20 @@ git).
 
 Les temps de trajet et les itinéraires sont calculés par un serveur
 [OSRM](https://project-osrm.org) dont l'URL est configurable (onglet
-Fleetview, vide = désactivé). Les coordonnées du lieu du ticket et des
-véhicules sont envoyées à ce serveur.
+Fleetview). Les coordonnées GPS du lieu du ticket et des véhicules affichés
+sont envoyées à ce serveur à chaque ouverture de la carte : des coordonnées
+seules, sans nom ni identifiant, accompagnées de l'adresse IP du serveur
+GLPI.
 
-Par défaut, le plugin pointe sur le serveur de démonstration
-`https://router.project-osrm.org`. Ses contraintes :
+**Le routage est désactivé par défaut** (URL vide) : la carte fonctionne
+sans, les bulles indiquent alors la distance à vol d'oiseau et les véhicules
+sont triés selon elle. L'activer est une décision explicite de
+l'administrateur ; quand l'URL renseignée pointe hors du réseau de
+l'organisation, le formulaire affiche un avertissement sur ce transfert à
+un tiers.
+
+Le serveur de démonstration du projet, `https://router.project-osrm.org`,
+peut être renseigné pour un essai. Ses contraintes :
 
 - **Serveur de démonstration, sans garantie de service** : le projet OSRM le
   réserve aux usages modérés et peut bloquer les usages intensifs. Le
@@ -204,8 +216,8 @@ Tout échec du routage est dégradé silencieusement : la carte et les
 marqueurs restent affichés, seuls les temps de trajet et les itinéraires
 manquent (tri à vol d'oiseau).
 
-**Auto-hébergement** : pour un usage soutenu ou pour ne pas envoyer de
-coordonnées à un tiers, OSRM s'installe avec l'image Docker
+**Auto-hébergement** (recommandé) : pour un usage soutenu ou pour ne pas
+envoyer de coordonnées à un tiers, OSRM s'installe avec l'image Docker
 `osrm/osrm-backend` et un extrait OpenStreetMap de la zone couverte (par
 exemple depuis [Geofabrik](https://download.geofabrik.de/)) :
 

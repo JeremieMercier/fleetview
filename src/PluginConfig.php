@@ -40,10 +40,12 @@ use GLPIKey;
 use GlpiPlugin\Fleetview\Masternaut\MasternautApiException;
 use GlpiPlugin\Fleetview\Masternaut\MasternautClient;
 use Safe\Exceptions\JsonException;
+use Safe\Exceptions\UrlException;
 use Session;
 
 use function Safe\json_decode;
 use function Safe\json_encode;
+use function Safe\parse_url;
 
 /**
  * Plugin configuration, stored in the `glpi_configs` table under the
@@ -93,8 +95,10 @@ final class PluginConfig extends CommonGLPI
             'modal_group'  => '',      // Masternaut group names
             'modal_status' => '',      // IN_CIRCULATION / IN_MAINTENANCE / SOLD
             // OSRM-compatible routing service for driving time estimations.
-            // Coordinates are sent to this third-party service; empty = disabled.
-            'routing_base_url' => 'https://router.project-osrm.org',
+            // Coordinates (ticket site, vehicles) are sent to this service:
+            // opt-in, empty = disabled. The public demo server
+            // (https://router.project-osrm.org) may be entered explicitly.
+            'routing_base_url' => '',
             // Fall back on name matching (vehicle/driver name vs GLPI users)
             // when a vehicle has no explicit association. Off by default:
             // it only makes sense when vehicles are named after technicians.
@@ -232,9 +236,47 @@ final class PluginConfig extends CommonGLPI
         $config['api_secret'] = '';
 
         TemplateRenderer::getInstance()->display('@fleetview/config_api.html.twig', [
-            'config'      => $config,
-            'form_action' => self::getRootDoc() . '/plugins/fleetview/config',
+            'config'           => $config,
+            'form_action'      => self::getRootDoc() . '/plugins/fleetview/config',
+            'routing_external' => self::isExternalHost($config['routing_base_url']),
         ]);
+    }
+
+    /**
+     * Whether a service URL points outside the organisation network:
+     * anything but the loopback, the private IP ranges and hostnames
+     * without a public domain. Used to warn about location data sent to a
+     * third party.
+     */
+    public static function isExternalHost(string $url): bool
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return false;
+        }
+
+        try {
+            $host = parse_url($url, PHP_URL_HOST);
+        } catch (UrlException) {
+            return false;
+        }
+
+        if (!is_string($host) || $host === '') {
+            return false;
+        }
+
+        $host = strtolower(trim($host, '[]'));
+        if ($host === 'localhost' || str_ends_with($host, '.localhost') || str_ends_with($host, '.local')) {
+            return false;
+        }
+
+        if (filter_var($host, FILTER_VALIDATE_IP) !== false) {
+            // Public IP: external; loopback, private and link-local: internal
+            return filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false;
+        }
+
+        // Bare hostname (no domain): the local network
+        return str_contains($host, '.');
     }
 
     /**
