@@ -395,14 +395,20 @@ final class PluginConfig extends CommonGLPI
         $client         = new MasternautClient($config);
         if ($client->isConfigured()) {
             try {
-                $mappings = VehicleMapping::getMap();
+                // Every association, whatever its entity: the screen manages
+                // them all (new ones default to the active entity, with
+                // child entities enabled)
+                $mappings = VehicleMapping::getAll();
                 $matcher  = new TechnicianMatcher();
                 foreach ($client->getVehicles() as $vehicle) {
-                    $users_id = $mappings[$vehicle['id']] ?? 0;
+                    $mapping  = $mappings[$vehicle['id']] ?? null;
+                    $users_id = $mapping['users_id'] ?? 0;
                     $vehicle['status_label'] = self::getStatusLabel($vehicle['status']);
                     $vehicles[] = $vehicle + [
                         'users_id'     => $users_id,
                         'suggested_id' => $users_id === 0 ? ($matcher->match($vehicle['name']) ?? 0) : 0,
+                        'entities_id'  => $mapping['entities_id'] ?? Session::getActiveEntity(),
+                        'is_recursive' => $mapping['is_recursive'] ?? true,
                     ];
                 }
             } catch (MasternautApiException $e) {
@@ -410,10 +416,18 @@ final class PluginConfig extends CommonGLPI
             }
         }
 
+        $active_entities = [];
+        foreach ((array) ($_SESSION['glpiactiveentities'] ?? []) as $entities_id) {
+            if (is_numeric($entities_id)) {
+                $active_entities[] = (int) $entities_id;
+            }
+        }
+
         TemplateRenderer::getInstance()->display('@fleetview/config_mappings.html.twig', [
             'vehicles'        => $vehicles,
             'vehicles_error'  => $vehicles_error,
             'mappings_action' => self::getRootDoc() . '/plugins/fleetview/mappings',
+            'active_entities' => $active_entities,
         ]);
     }
 

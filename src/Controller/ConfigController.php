@@ -77,12 +77,21 @@ final class ConfigController extends AbstractController
     {
         Session::checkRight(VehicleMapping::$rightname, UPDATE);
 
-        $mappings = $request->request->all('mappings');
-        $labels   = $request->request->all('labels');
+        $mappings  = $request->request->all('mappings');
+        $labels    = $request->request->all('labels');
+        $entities  = $request->request->all('entities');
+        $recursive = $request->request->all('recursive');
 
         foreach ($mappings as $asset_id => $users_id) {
             if (!is_numeric($users_id)) {
                 continue;
+            }
+
+            // The entity must be one the user may access; the active entity
+            // otherwise (child entities enabled unless unticked)
+            $entities_id = is_numeric($entities[$asset_id] ?? null) ? (int) $entities[$asset_id] : Session::getActiveEntity();
+            if (!Session::haveAccessToEntity($entities_id)) {
+                $entities_id = Session::getActiveEntity();
             }
 
             $label = $labels[$asset_id] ?? '';
@@ -90,6 +99,8 @@ final class ConfigController extends AbstractController
                 (string) $asset_id,
                 is_scalar($label) ? (string) $label : '',
                 (int) $users_id,
+                $entities_id,
+                ($recursive[$asset_id] ?? '1') !== '0',
             );
         }
 

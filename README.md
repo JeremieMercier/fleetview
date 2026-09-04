@@ -14,8 +14,9 @@ la distance par la route (OSRM), et le **planning à venir** du technicien
 associé : tâches de tickets planifiées et événements externes du planning,
 triés chronologiquement, avec un badge « en cours », « aujourd'hui » ou
 « demain ». L'itinéraire routier des trois véhicules les plus proches est
-tracé sur la carte, dans la couleur de leur marqueur. Les droits GLPI s'appliquent (tâches privées,
-visibilité du planning, entités).
+tracé sur la carte, dans la couleur de leur marqueur. Les droits GLPI
+s'appliquent : tâches privées, visibilité du planning et des tickets, et
+entités des associations véhicule / technicien.
 
 ## Prérequis
 
@@ -135,6 +136,11 @@ listées dans la bulle (`0` masque la section), prise en compte des
 événements externes (activée par défaut ; les événements récurrents ne sont
 pas développés) et affichage des véhicules sans technicien associé.
 
+Onglet *Associations véhicules / techniciens* : chaque véhicule de la flotte
+est associé à un utilisateur GLPI, dans une entité, avec ou sans ses
+sous-entités (par défaut l'entité active, sous-entités comprises). Voir la
+section Droits pour la portée de ces associations.
+
 La carte propose un interrupteur « Véhicules sans technicien » : désactivé
 (valeur par défaut configurable), seuls les véhicules associés à un
 technicien GLPI (association explicite ou correspondance par nom) sont
@@ -162,6 +168,20 @@ les techniciens que la carte propose pour ce ticket : associés à un
 véhicule (association explicite ou correspondance par nom) et habilités à
 prendre des tickets dans l'entité du ticket, comme la liste déroulante
 native des acteurs.
+
+**Entités.** La flotte Masternaut est globale (un seul compte), la carte
+affiche donc les véhicules autour du ticket quelle que soit l'entité. Ce
+qui est propre à GLPI, l'identité du technicien qui conduit chaque véhicule,
+est en revanche limité à l'entité du ticket, comme la liste déroulante
+native des acteurs : une association n'est prise en compte que pour les
+tickets de son entité (et de ses sous-entités si l'option est cochée), et la
+correspondance par nom ne considère que les utilisateurs ayant un profil
+couvrant l'entité du ticket. Sur les autres tickets, le véhicule apparaît
+comme « sans technicien », sans nom et sans bouton d'attribution ; par
+défaut, ces véhicules sont masqués. Les associations existantes sont rattachées à
+l'entité racine avec sous-entités lors de la mise à jour vers 0.6.0, ce qui
+conserve le comportement précédent : restreindre ensuite chaque association
+à une entité est un choix de l'administrateur.
 
 Le planning listé dans la bulle (tâches planifiées et événements externes)
 suit le droit GLPI *Planning* du profil (onglet *Assistance*) : « voir tous

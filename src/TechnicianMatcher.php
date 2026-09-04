@@ -34,6 +34,7 @@
 namespace GlpiPlugin\Fleetview;
 
 use DBmysql;
+use Profile_User;
 use User;
 
 use function Safe\preg_replace;
@@ -54,8 +55,12 @@ final class TechnicianMatcher
      * @param ?iterable<array<array-key, mixed>> $users User rows override
      *        (`id`, `firstname`, `realname`), mainly for unit tests; defaults
      *        to the active, non-deleted GLPI users.
+     * @param ?int $entities_id Entity whose tickets the matching serves:
+     *        only the users holding a profile covering it are candidates
+     *        (the entities of the session when null, e.g. the configuration
+     *        screen suggestions)
      */
-    public function __construct(private readonly ?iterable $users = null) {}
+    public function __construct(private readonly ?iterable $users = null, private readonly ?int $entities_id = null) {}
 
     /**
      * GLPI user id matching the given vehicle/driver name, or null.
@@ -86,13 +91,22 @@ final class TechnicianMatcher
 
         $this->index = [];
 
+        // Active users holding a profile covering the entity (their own,
+        // or an ancestor with child entities enabled): a vehicle name is
+        // only matched to somebody the ticket entity may be assigned to
+        $user_tbl = User::getTable();
+        $pu_tbl   = Profile_User::getTable();
         $iterator = $this->users ?? $DB->request([
-            'SELECT' => ['id', 'firstname', 'realname'],
-            'FROM'   => User::getTable(),
-            'WHERE'  => [
-                'is_active'  => 1,
-                'is_deleted' => 0,
+            'SELECT'     => [$user_tbl . '.id', $user_tbl . '.firstname', $user_tbl . '.realname'],
+            'DISTINCT'   => true,
+            'FROM'       => $user_tbl,
+            'INNER JOIN' => [
+                $pu_tbl => ['ON' => [$pu_tbl => 'users_id', $user_tbl => 'id']],
             ],
+            'WHERE'      => [
+                $user_tbl . '.is_active'  => 1,
+                $user_tbl . '.is_deleted' => 0,
+            ] + getEntitiesRestrictCriteria($pu_tbl, '', $this->entities_id ?? '', true),
         ]);
 
         foreach ($iterator as $user) {

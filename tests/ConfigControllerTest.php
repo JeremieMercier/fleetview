@@ -35,11 +35,13 @@ namespace GlpiPlugin\Fleetview\Tests;
 
 use Glpi\Exception\Http\AccessDeniedHttpException;
 use Config;
+use Entity;
 use Glpi\Tests\DbTestCase;
 use GlpiPlugin\Fleetview\Controller\ConfigController;
 use GlpiPlugin\Fleetview\PluginConfig;
 use GlpiPlugin\Fleetview\VehicleMapping;
 use Symfony\Component\HttpFoundation\RedirectResponse;
+use Session;
 use Symfony\Component\HttpFoundation\Request;
 
 /**
@@ -134,6 +136,11 @@ final class ConfigControllerTest extends DbTestCase
 
         $this->assertInstanceOf(RedirectResponse::class, $response);
         $this->assertSame(42, VehicleMapping::getMap()[$asset_id] ?? null);
+        // No entity given: the active one, child entities enabled
+        $this->assertSame(
+            ['users_id' => 42, 'entities_id' => (int) Session::getActiveEntity(), 'is_recursive' => true],
+            VehicleMapping::getAll()[$asset_id],
+        );
 
         $controller->saveMappings(Request::create('', 'POST', [
             'mappings' => [$asset_id => '0'],
@@ -141,6 +148,33 @@ final class ConfigControllerTest extends DbTestCase
         ]));
 
         $this->assertArrayNotHasKey($asset_id, VehicleMapping::getMap());
+    }
+
+    public function testSaveMappingsStoresTheEntityOfEachAssociation(): void
+    {
+        $this->login('glpi');
+        $this->setEntity('_test_root_entity', true);
+        $child_1  = getItemByTypeName(Entity::class, '_test_child_1', true);
+        $child_2  = getItemByTypeName(Entity::class, '_test_child_2', true);
+        $asset_id = 'test_asset_' . uniqid();
+
+        (new ConfigController())->saveMappings(Request::create('', 'POST', [
+            'mappings'  => [$asset_id => '42'],
+            'labels'    => [$asset_id => 'Dupont Jean'],
+            'entities'  => [$asset_id => (string) $child_1],
+            'recursive' => [$asset_id => '0'],
+        ]));
+        $this->assertSame(['users_id' => 42, 'entities_id' => $child_1, 'is_recursive' => false], VehicleMapping::getAll()[$asset_id]);
+
+        // An entity out of the user's reach falls back to the active one
+        $this->setEntity('_test_child_1', false);
+        (new ConfigController())->saveMappings(Request::create('', 'POST', [
+            'mappings'  => [$asset_id => '42'],
+            'labels'    => [$asset_id => 'Dupont Jean'],
+            'entities'  => [$asset_id => (string) $child_2],
+            'recursive' => [$asset_id => '1'],
+        ]));
+        $this->assertSame(['users_id' => 42, 'entities_id' => $child_1, 'is_recursive' => true], VehicleMapping::getAll()[$asset_id]);
     }
 
     public function testSaveMappingsIgnoresNonNumericValues(): void

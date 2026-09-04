@@ -226,6 +226,10 @@ msgstr ""
 msgid "Associate each Masternaut vehicle with a GLPI user. Rows marked \"suggestion\" are pre-filled from name matching: save to confirm them."
 msgstr ""
 
+#: templates/config_mappings.html.twig
+msgid "An association only applies to the tickets of its entity (and of its child entities when enabled): on other tickets, the vehicle appears as not linked, without the technician name."
+msgstr ""
+
 #: templates/config.html.twig
 msgid "Vehicle"
 msgstr ""

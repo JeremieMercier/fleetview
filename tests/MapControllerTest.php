@@ -89,13 +89,13 @@ final class MapControllerTest extends DbTestCase
         return $location;
     }
 
-    private function createTicket(int $locations_id = 0, int $requester_id = 0): Ticket
+    private function createTicket(int $locations_id = 0, int $requester_id = 0, int $entities_id = 0): Ticket
     {
         $ticket = new Ticket();
         $input  = [
             'name'         => 'Ticket test fictif',
             'content'      => 'Contenu de test fictif',
-            'entities_id'  => $this->rootEntityId(),
+            'entities_id'  => $entities_id > 0 ? $entities_id : $this->rootEntityId(),
             'locations_id' => $locations_id,
         ];
         if ($requester_id > 0) {
@@ -510,19 +510,82 @@ final class MapControllerTest extends DbTestCase
         $this->configurePluginApi(['name_matching_fallback' => '1']);
         $ticket = $this->createTicket($this->createGeoLocation()->getID());
 
-        $technician = new User();
-        $technician_id = $technician->add([
-            'name'      => 'fake_tech_' . uniqid(),
-            'firstname' => 'Jean',
-            'realname'  => 'Dupont',
-            'is_active' => 1,
-        ]);
-        $this->assertGreaterThan(0, $technician_id);
+        // Named after the fictional vehicle "Dupont Jean", technician of
+        // the root entity tree
+        $technician_id = $this->createTechnician('Technician', $this->rootEntityId(), true);
 
         $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
 
         $by_id = array_column($payload['vehicles'], 'user_id', 'id');
         $this->assertSame($technician_id, $by_id['201']);
+    }
+
+    public function testTicketVehiclesOnlyLinksAssociationsCoveringTheTicketEntity(): void
+    {
+        // Session on the whole tree: the ticket entity decides, not the
+        // entities the user may access
+        $this->login('glpi');
+        $this->setEntity('_test_root_entity', true);
+        $this->configurePluginApi();
+        $child_1  = getItemByTypeName(Entity::class, '_test_child_1', true);
+        $child_2  = getItemByTypeName(Entity::class, '_test_child_2', true);
+        $location = $this->createGeoLocation()->getID();
+
+        // Vehicle 201 is associated in child 2 only, vehicle 202 at the root
+        // for the whole tree
+        $tech_2 = $this->createTechnician('Technician', $child_2, false, null, ['firstname' => 'Paul', 'realname' => 'Durand']);
+        VehicleMapping::save('201', 'Dupont Jean', $tech_2, $child_2, false);
+        $tech_tree = $this->createTechnician('Technician', $this->rootEntityId(), true, null, ['firstname' => 'Sophie', 'realname' => 'Martin']);
+        VehicleMapping::save('202', 'Martin Sophie', $tech_tree, $this->rootEntityId(), true);
+
+        // Ticket of child 1: the association of child 2 does not apply,
+        // vehicle 201 is unlinked and its technician is not named
+        $ticket  = $this->createTicket($location, 0, $child_1);
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $by_id   = array_column($payload['vehicles'], null, 'id');
+        $this->assertFalse($by_id['201']['technician_linked']);
+        $this->assertNull($by_id['201']['user_id']);
+        $this->assertNull($by_id['201']['technician_name']);
+        $this->assertTrue($by_id['202']['technician_linked']);
+        $this->assertSame($tech_tree, $by_id['202']['user_id']);
+
+        // Nor can that technician be assigned to it
+        $request = Request::create('', 'POST', content: json_encode(['users_id' => $tech_2]));
+        $this->assertSame(403, $this->mockedController()->assignTechnician($request, $ticket->getID())->getStatusCode());
+
+        // Ticket of child 2: linked
+        $ticket  = $this->createTicket($location, 0, $child_2);
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $by_id   = array_column($payload['vehicles'], null, 'id');
+        $this->assertTrue($by_id['201']['technician_linked']);
+        $this->assertSame($tech_2, $by_id['201']['user_id']);
+        $this->assertSame($tech_tree, $by_id['202']['user_id']);
+    }
+
+    public function testTicketVehiclesNameMatchingIsScopedToTheTicketEntity(): void
+    {
+        $this->login('glpi');
+        $this->setEntity('_test_root_entity', true);
+        $this->configurePluginApi(['name_matching_fallback' => '1']);
+        $child_1  = getItemByTypeName(Entity::class, '_test_child_1', true);
+        $child_2  = getItemByTypeName(Entity::class, '_test_child_2', true);
+        $location = $this->createGeoLocation()->getID();
+
+        // "Jean Dupont" only holds a profile in child 2
+        $technician_id = $this->createTechnician('Technician', $child_2, false);
+
+        // On a ticket of child 1, the vehicle name matches nobody
+        $ticket  = $this->createTicket($location, 0, $child_1);
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $by_id   = array_column($payload['vehicles'], null, 'id');
+        $this->assertFalse($by_id['201']['technician_linked']);
+        $this->assertNull($by_id['201']['technician_name']);
+
+        // On a ticket of child 2, it does
+        $ticket  = $this->createTicket($location, 0, $child_2);
+        $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
+        $by_id   = array_column($payload['vehicles'], null, 'id');
+        $this->assertSame($technician_id, $by_id['201']['user_id']);
     }
 
     public function testTicketVehiclesHidesUnlinkedVehiclesWhenConfigured(): void
@@ -590,14 +653,9 @@ final class MapControllerTest extends DbTestCase
         $this->configurePluginApi(['modal_show_unlinked' => '0', 'name_matching_fallback' => '1']);
         $ticket = $this->createTicket($this->createGeoLocation()->getID());
 
-        $technician = new User();
-        $technician_id = $technician->add([
-            'name'      => 'fake_tech_' . uniqid(),
-            'firstname' => 'Jean',
-            'realname'  => 'Dupont',
-            'is_active' => 1,
-        ]);
-        $this->assertGreaterThan(0, $technician_id);
+        // Named after the fictional vehicle "Dupont Jean", technician of
+        // the root entity tree
+        $technician_id = $this->createTechnician('Technician', $this->rootEntityId(), true);
 
         $one_route = [new Response(200, [], json_encode(['code' => 'Ok', 'durations' => [[0, 1800]], 'distances' => [[0, 12000]]]))];
         $payload = $this->payload($this->mockedController(null, $one_route)->ticketVehicles(Request::create(''), $ticket->getID()));

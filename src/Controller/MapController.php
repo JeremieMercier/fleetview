@@ -155,11 +155,12 @@ final class MapController extends AbstractController
         }
 
         // Link vehicles to GLPI users: explicit associations first, optional
-        // name matching as fallback. The link drives the unlinked vehicles
-        // filter and the planned interventions of the popup; the assignment
-        // button additionally needs the right.
-        $mappings = VehicleMapping::getMap();
-        $matcher  = $config['name_matching_fallback'] ? new TechnicianMatcher() : null;
+        // name matching as fallback, both limited to the ticket entity (the
+        // fleet is global, the technician identities are not). The link
+        // drives the unlinked vehicles filter and the planned interventions
+        // of the popup; the assignment button additionally needs the right.
+        $mappings = VehicleMapping::getMap($ticket->getEntityID());
+        $matcher  = $config['name_matching_fallback'] ? new TechnicianMatcher(null, $ticket->getEntityID()) : null;
 
         try {
             $vehicles = $client->getNearbyVehicles(
@@ -366,7 +367,7 @@ final class MapController extends AbstractController
     private function getAssignableTechnicians(Ticket $ticket): array
     {
         $config     = PluginConfig::getConfig();
-        $mappings   = VehicleMapping::getMap();
+        $mappings   = VehicleMapping::getMap($ticket->getEntityID());
         $candidates = array_values(array_unique(array_values($mappings)));
 
         $location = $this->getTicketLocation($ticket);
@@ -376,7 +377,7 @@ final class MapController extends AbstractController
             $config['search_radius'] = $config['search_radius_max'];
             $client = $this->buildMasternautClient($config);
             if ($client->isConfigured()) {
-                $matcher = new TechnicianMatcher();
+                $matcher = new TechnicianMatcher(null, $ticket->getEntityID());
                 try {
                     foreach ($client->getNearbyVehicles($location['latitude'], $location['longitude']) as $vehicle) {
                         $users_id = $this->resolveTechnician($vehicle, $mappings, $matcher);

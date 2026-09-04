@@ -50,6 +50,7 @@
             {% else %}
                 <p class="text-secondary">
                     {{ __('Associate each Masternaut vehicle with a GLPI user. Rows marked "suggestion" are pre-filled from name matching: save to confirm them.', 'fleetview') }}
+                    {{ __('An association only applies to the tickets of its entity (and of its child entities when enabled): on other tickets, the vehicle appears as not linked, without the technician name.', 'fleetview') }}
                 </p>
                 <div class="table-responsive">
                     <table class="table table-sm table-striped align-middle" id="fleetview-mappings-table">
@@ -61,7 +62,9 @@
                                 <th role="button" data-sort="type">{{ __('Type') }} <i class="ti"></i></th>
                                 <th role="button" data-sort="makemodel">{{ __('Make / model', 'fleetview') }} <i class="ti"></i></th>
                                 <th role="button" data-sort="status">{{ __('Status') }} <i class="ti"></i></th>
-                                <th role="button" data-sort="state" class="w-33">{{ 'User'|itemtype_name }} <i class="ti"></i></th>
+                                <th role="button" data-sort="state" class="w-25">{{ 'User'|itemtype_name }} <i class="ti"></i></th>
+                                <th class="w-25">{{ 'Entity'|itemtype_name }}</th>
+                                <th>{{ __('Child entities') }}</th>
                             </tr>
                             <tr>
                                 <th><input type="text" class="form-control form-control-sm" data-filter="name" placeholder="{{ __('Filter…', 'fleetview') }}"></th>
@@ -90,6 +93,8 @@
                                         <option value="none">{{ __('Not associated', 'fleetview') }}</option>
                                     </select>
                                 </th>
+                                <th></th>
+                                <th></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -119,6 +124,18 @@
                                         {% if vehicle.users_id == 0 and vehicle.suggested_id > 0 %}
                                             <span class="badge bg-yellow-lt ms-1">{{ __('suggestion', 'fleetview') }}</span>
                                         {% endif %}
+                                    </td>
+                                    <td>
+                                        {% do call('Entity::dropdown', [{
+                                            'name': 'entities[' ~ vehicle.id ~ ']',
+                                            'value': vehicle.entities_id,
+                                            'entity': active_entities,
+                                            'width': '100%',
+                                        }]) %}
+                                    </td>
+                                    <td class="text-center">
+                                        <input type="hidden" name="recursive[{{ vehicle.id }}]" value="0" />
+                                        <input type="checkbox" class="form-check-input" name="recursive[{{ vehicle.id }}]" value="1" {{ vehicle.is_recursive ? 'checked' : '' }} />
                                     </td>
                                 </tr>
                             {% endfor %}

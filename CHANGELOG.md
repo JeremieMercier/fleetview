@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Entity (with the "child entities" flag) on each vehicle to technician
+  association, in the associations tab: an association is only taken into
+  account for the tickets of its entity. Existing associations are attached to the root
+  entity with child entities enabled on update, which keeps the previous
+  behaviour.
 - "Maximum search radius" setting, the upper limit of the radius selector of
   the map (150 km by default, 500 km at most: the provider limit). The
   existing "Search radius" setting is documented as what it always was: the
@@ -30,6 +35,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Security
 
+- The GLPI identity of the vehicle technicians (association, name matching,
+  displayed name, assignment) is scoped to the entity of the ticket, as the
+  native actor dropdown: the associations were global and the name matching
+  considered every active user, so a technician of one entity could follow
+  the live positions of the named technicians of unrelated entities. The fleet itself stays global
+  (one Masternaut account): out of reach, a vehicle is "not linked", without
+  name, and hidden by default (marketplace security review of 0.5.0,
+  [#12](https://github.com/JeremieMercier/fleetview/issues/12)).
 - The assignment from the map only accepts the technicians the map may
   offer for the ticket (linked to a vehicle, holding the "own ticket" right
   in the ticket entity, as the native actor dropdown requires): the assignee
