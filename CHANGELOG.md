@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-04
+
 ### Added
 
 - The vehicle to technician associations table is paginated (GLPI "number
@@ -170,7 +172,8 @@ First tagged release.
 - Unit and functional tests, GLPI quality tooling (php-cs-fixer, phpstan,
   rector, lints).
 
-[Unreleased]: https://github.com/JeremieMercier/fleetview/compare/0.5.0...HEAD
+[Unreleased]: https://github.com/JeremieMercier/fleetview/compare/0.6.0...HEAD
+[0.6.0]: https://github.com/JeremieMercier/fleetview/compare/0.5.0...0.6.0
 [0.5.0]: https://github.com/JeremieMercier/fleetview/compare/0.4.0...0.5.0
 [0.4.0]: https://github.com/JeremieMercier/fleetview/compare/0.3.0...0.4.0
 [0.3.0]: https://github.com/JeremieMercier/fleetview/compare/0.2.13...0.3.0
