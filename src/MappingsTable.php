@@ -58,6 +58,7 @@ final class MappingsTable
 {
     /** Text filters (substring, case-insensitive) and exact-match filters */
     private const TEXT_FILTERS  = ['name', 'registration', 'make_model'];
+
     private const EXACT_FILTERS = ['group', 'type', 'status_label'];
 
     public const SORTABLE = ['name', 'registration', 'group', 'type', 'make_model', 'status_label', 'state'];

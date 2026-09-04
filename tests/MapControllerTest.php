@@ -693,13 +693,13 @@ final class MapControllerTest extends DbTestCase
         // Wider than the maximum: the maximum, not the provider limit of 500 km
         foreach (['9999', '500', '76'] as $radius) {
             $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create('', 'GET', ['radius' => $radius]), $ticket->getID()));
-            $this->assertSame(75, (int) $payload['radius_km'], "radius=$radius");
+            $this->assertSame(75, (int) $payload['radius_km'], 'radius=' . $radius);
         }
 
         // Within the maximum: honoured, wider than the default included
         foreach (['25', '75'] as $radius) {
             $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create('', 'GET', ['radius' => $radius]), $ticket->getID()));
-            $this->assertSame((int) $radius, (int) $payload['radius_km'], "radius=$radius");
+            $this->assertSame((int) $radius, (int) $payload['radius_km'], 'radius=' . $radius);
         }
 
         // Below the minimum
