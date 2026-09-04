@@ -226,6 +226,18 @@ msgstr "Fill the user with this suggestion"
 msgid "Suggestion: %s"
 msgstr "Suggestion: %s"
 
+#: templates/config_mappings.html.twig
+msgid "The table is paginated: save the current page before moving to another one."
+msgstr "The table is paginated: save the current page before moving to another one."
+
+#: templates/config_mappings.html.twig
+msgid "No vehicle matches the filters."
+msgstr "No vehicle matches the filters."
+
+#: templates/config_mappings.html.twig
+msgid "Unsaved changes on this page will be lost. Continue?"
+msgstr "Unsaved changes on this page will be lost. Continue?"
+
 #: templates/config.html.twig
 msgid "Vehicle to technician associations"
 msgstr "Vehicle to technician associations"

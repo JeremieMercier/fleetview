@@ -389,8 +389,9 @@ final class PluginConfig extends CommonGLPI
         $config = self::getConfig();
 
         // Vehicle to user associations, with name-matching suggestions for
-        // vehicles that are not associated yet.
-        $vehicles       = [];
+        // vehicles that are not associated yet. The whole (cached) fleet is
+        // filtered and sorted server-side, one page of it is rendered.
+        $rows           = [];
         $vehicles_error = null;
         $client         = new MasternautClient($config);
         if ($client->isConfigured()) {
@@ -401,23 +402,40 @@ final class PluginConfig extends CommonGLPI
                 $mappings = VehicleMapping::getAll();
                 $matcher  = new TechnicianMatcher();
                 foreach ($client->getVehicles() as $vehicle) {
-                    $mapping      = $mappings[$vehicle['id']] ?? null;
-                    $users_id     = $mapping['users_id'] ?? 0;
-                    // Name-matching suggestion, only offered: it is never
-                    // saved unless the administrator applies it explicitly
-                    $suggested_id = $users_id === 0 ? ($matcher->match($vehicle['name']) ?? 0) : 0;
-                    $vehicle['status_label'] = self::getStatusLabel($vehicle['status']);
-                    $vehicles[] = $vehicle + [
-                        'users_id'       => $users_id,
-                        'suggested_id'   => $suggested_id,
-                        'suggested_name' => $suggested_id > 0 ? getUserName($suggested_id) : '',
-                        'entities_id'  => $mapping['entities_id'] ?? Session::getActiveEntity(),
-                        'is_recursive' => $mapping['is_recursive'] ?? true,
+                    $users_id = $mappings[$vehicle['id']]['users_id'] ?? 0;
+                    $rows[]   = $vehicle + [
+                        'status_label' => self::getStatusLabel($vehicle['status']),
+                        'users_id'     => $users_id,
+                        // Only offered: never saved unless applied explicitly
+                        'suggested_id' => $users_id === 0 ? ($matcher->match($vehicle['name']) ?? 0) : 0,
                     ];
                 }
             } catch (MasternautApiException $e) {
                 $vehicles_error = $e->getMessage();
             }
+        }
+
+        // Filters, sort and page come from the tab reload parameters
+        $filters = MappingsTable::filters($_GET['filters'] ?? null);
+        $limit   = is_numeric($_SESSION['glpilist_limit'] ?? null) ? max(1, (int) $_SESSION['glpilist_limit']) : 20;
+        $page    = MappingsTable::page(
+            $rows,
+            $filters,
+            is_string($_GET['sort'] ?? null) ? $_GET['sort'] : '',
+            is_string($_GET['order'] ?? null) ? $_GET['order'] : '',
+            is_numeric($_GET['start'] ?? null) ? (int) $_GET['start'] : 0,
+            $limit,
+        );
+
+        $vehicles = [];
+        foreach ($page['rows'] as $row) {
+            $mapping    = $mappings[$row['id']] ?? null;
+            $vehicles[] = $row + [
+                'state'          => MappingsTable::state($row),
+                'suggested_name' => $row['suggested_id'] > 0 ? getUserName($row['suggested_id']) : '',
+                'entities_id'    => $mapping['entities_id'] ?? Session::getActiveEntity(),
+                'is_recursive'   => $mapping['is_recursive'] ?? true,
+            ];
         }
 
         $active_entities = [];
@@ -427,9 +445,25 @@ final class PluginConfig extends CommonGLPI
             }
         }
 
+        // Filters and sort travel with every pager link / tab reload
+        $reload_params = http_build_query([
+            'filters' => $filters,
+            'sort'    => $page['sort'],
+            'order'   => $page['order'],
+        ]);
+
         TemplateRenderer::getInstance()->display('@fleetview/config_mappings.html.twig', [
             'vehicles'        => $vehicles,
             'vehicles_error'  => $vehicles_error,
+            'fleet_size'      => count($rows),
+            'total'           => $page['total'],
+            'filters'         => $filters,
+            'choices'         => MappingsTable::choices($rows),
+            'sort'            => $page['sort'],
+            'order'           => $page['order'],
+            'reload_params'   => $reload_params,
+            'start'           => $page['start'],
+            'limit'           => $limit,
             'mappings_action' => self::getRootDoc() . '/plugins/fleetview/mappings',
             'active_entities' => $active_entities,
         ]);

@@ -238,6 +238,18 @@ msgid "Suggestion: %s"
 msgstr "Suggestion : %s"
 
 #: templates/config_mappings.html.twig
+msgid "The table is paginated: save the current page before moving to another one."
+msgstr "Le tableau est paginé : enregistrez la page en cours avant de passer à une autre."
+
+#: templates/config_mappings.html.twig
+msgid "No vehicle matches the filters."
+msgstr "Aucun véhicule ne correspond aux filtres."
+
+#: templates/config_mappings.html.twig
+msgid "Unsaved changes on this page will be lost. Continue?"
+msgstr "Les modifications non enregistrées de cette page seront perdues. Continuer ?"
+
+#: templates/config_mappings.html.twig
 msgid "An association only applies to the tickets of its entity (and of its child entities when enabled): on other tickets, the vehicle appears as not linked, without the technician name."
 msgstr "Une association ne s'applique qu'aux tickets de son entité (et de ses sous-entités si l'option est cochée) : sur les autres tickets, le véhicule apparaît comme non associé, sans le nom du technicien."
 

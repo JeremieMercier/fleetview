@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The vehicle to technician associations table is paginated (GLPI "number
+  of items per page" preference, standard pager), with its filters and sort
+  handled server-side on the whole fleet: only one page of rows, each
+  carrying two dropdowns, is rendered, which keeps the tab fast on large
+  fleets. Associations are saved page by page.
 - Entity (with the "child entities" flag) on each vehicle to technician
   association, in the associations tab: an association is only taken into
   account for the tickets of its entity. Existing associations are attached to the root

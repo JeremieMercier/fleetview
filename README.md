@@ -139,7 +139,10 @@ pas développés) et affichage des véhicules sans technicien associé.
 Onglet *Associations véhicules / techniciens* : chaque véhicule de la flotte
 est associé à un utilisateur GLPI, dans une entité, avec ou sans ses
 sous-entités (par défaut l'entité active, sous-entités comprises). Voir la
-section Droits pour la portée de ces associations.
+section Droits pour la portée de ces associations. Le tableau est paginé
+selon la préférence GLPI « nombre d'éléments par page », filtres et tri
+portant sur toute la flotte ; les associations s'enregistrent page par page,
+et les suggestions par nom ne s'appliquent qu'en cliquant dessus.
 
 La carte propose un interrupteur « Véhicules sans technicien » : désactivé
 (valeur par défaut configurable), seuls les véhicules associés à un
