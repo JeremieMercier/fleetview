@@ -34,11 +34,12 @@
 namespace GlpiPlugin\Fleetview\Masternaut;
 
 use Closure;
+use GlpiPlugin\Fleetview\Http\HttpClientFactory;
 use GlpiPlugin\Fleetview\PluginConfig;
-use GuzzleHttp\ClientInterface;
-use GuzzleHttp\Exception\GuzzleException;
 use Psr\SimpleCache\CacheInterface;
 use Safe\Exceptions\JsonException;
+use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Toolbox;
 
 use function Safe\json_decode;
@@ -77,10 +78,10 @@ final class MasternautClient
     /**
      * @param ?array<string, string> $config      Configuration override
      *        (defaults to the stored plugin configuration)
-     * @param ?ClientInterface       $http_client HTTP client override, mainly
-     *        for tests (defaults to the GLPI Guzzle client, proxy-aware)
+     * @param ?HttpClientInterface   $http_client HTTP client override, mainly
+     *        for tests (defaults to a proxy-aware client, see HttpClientFactory)
      */
-    public function __construct(?array $config = null, private readonly ?ClientInterface $http_client = null)
+    public function __construct(?array $config = null, private readonly ?HttpClientInterface $http_client = null)
     {
         $this->config = $config ?? PluginConfig::getConfig();
     }
@@ -394,27 +395,26 @@ final class MasternautClient
             ltrim($path, '/'),
         );
 
-        $client = $this->http_client ?? Toolbox::getGuzzleClient([
-            'timeout' => 15,
-            'headers' => [
-                'Accept'          => 'application/json',
-                'Accept-Encoding' => 'gzip',
-            ],
+        // Compressed transfers are negotiated and decoded by the client
+        // itself (an explicit Accept-Encoding header would disable the decoding)
+        $client = $this->http_client ?? HttpClientFactory::create([
+            'max_duration' => 15,
+            'headers'      => ['Accept' => 'application/json'],
         ]);
 
         try {
+            // Responses are lazy: network failures surface when the status
+            // and the body are read
             $response = $client->request('GET', $url, [
-                'auth'        => [$this->config['api_username'], $this->config['api_secret']],
-                'query'       => $query,
-                'http_errors' => false,
+                'auth_basic' => [$this->config['api_username'], $this->config['api_secret']],
+                'query'      => $query,
             ]);
-        } catch (GuzzleException $guzzleException) {
-            Toolbox::logInFile('fleetview', sprintf("GET %s failed: %s\n", $path, $guzzleException->getMessage()));
-            throw new MasternautApiException(__('Unable to reach the Masternaut API.', 'fleetview'), 0, $guzzleException);
+            $status = $response->getStatusCode();
+            $body   = $response->getContent(false);
+        } catch (TransportExceptionInterface $transportException) {
+            Toolbox::logInFile('fleetview', sprintf("GET %s failed: %s\n", $path, $transportException->getMessage()));
+            throw new MasternautApiException(__('Unable to reach the Masternaut API.', 'fleetview'), 0, $transportException);
         }
-
-        $status = $response->getStatusCode();
-        $body   = (string) $response->getBody();
 
         if ($status === 429) {
             throw new MasternautApiException(__('Masternaut API rate limit exceeded, please retry in a few seconds.', 'fleetview'));

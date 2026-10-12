@@ -33,14 +33,10 @@
 
 namespace GlpiPlugin\Fleetview\Tests;
 
-use Psr\Http\Message\RequestInterface;
 use GlpiPlugin\Fleetview\Routing\OsrmRouter;
-use GuzzleHttp\Client;
-use GuzzleHttp\Handler\MockHandler;
-use GuzzleHttp\HandlerStack;
-use GuzzleHttp\Middleware;
-use GuzzleHttp\Psr7\Response;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
 
 /**
  * All coordinates and hosts in these tests are fictional.
@@ -51,8 +47,10 @@ final class OsrmRouterTest extends TestCase
 
     private const ORIGIN_LNG = 2.35;
 
-    /** @var array<int, array{request: RequestInterface}> */
-    private array $history = [];
+    /** @var list<MockResponse> Queued responses, each one recording the request it served */
+    private array $responses = [];
+
+    private MockHttpClient $http;
 
     /**
      * @return list<array{latitude: float, longitude: float}>
@@ -66,15 +64,29 @@ final class OsrmRouterTest extends TestCase
     }
 
     /**
-     * @param list<Response> $responses
+     * @param list<MockResponse> $responses
      */
-    private function mockHttpClient(array $responses): Client
+    private function mockHttpClient(array $responses): MockHttpClient
     {
-        $this->history = [];
-        $stack = HandlerStack::create(new MockHandler($responses));
-        $stack->push(Middleware::history($this->history));
+        $this->responses = $responses;
 
-        return new Client(['handler' => $stack]);
+        return $this->http = new MockHttpClient($responses);
+    }
+
+    private function jsonResponse(mixed $data, int $status = 200): MockResponse
+    {
+        return new MockResponse((string) json_encode($data), ['http_code' => $status]);
+    }
+
+    /**
+     * @return array{path: string, query: array<string, string>}
+     */
+    private function requestedUrl(int $index): array
+    {
+        $url = $this->responses[$index]->getRequestUrl();
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+
+        return ['path' => (string) parse_url($url, PHP_URL_PATH), 'query' => $query];
     }
 
     private function fakeBaseUrl(): string
@@ -83,21 +95,21 @@ final class OsrmRouterTest extends TestCase
         return 'https://osrm.example.test/' . uniqid();
     }
 
-    private function tableResponse(): Response
+    private function tableResponse(): MockResponse
     {
-        return new Response(200, [], json_encode([
+        return $this->jsonResponse([
             'code'      => 'Ok',
             'durations' => [[0, 600, 1224]],
             'distances' => [[0, 5000, 10240]],
-        ]));
+        ]);
     }
 
-    private function routeResponse(array $coordinates): Response
+    private function routeResponse(array $coordinates): MockResponse
     {
-        return new Response(200, [], json_encode([
+        return $this->jsonResponse([
             'code'   => 'Ok',
             'routes' => [['geometry' => ['type' => 'LineString', 'coordinates' => $coordinates]]],
-        ]));
+        ]);
     }
 
     public function testGeometriesAreMappedFromTheRouteResponses(): void
@@ -115,11 +127,11 @@ final class OsrmRouterTest extends TestCase
         ], $geometries);
 
         // One route request per origin, from the vehicle to the point
-        $this->assertCount(2, $this->history);
-        $uri = $this->history[0]['request']->getUri();
-        $this->assertStringEndsWith('/route/v1/driving/2.360000,48.860000;2.350000,48.850000', $uri->getPath());
-        $this->assertSame('overview=full&geometries=geojson', $uri->getQuery());
-        $this->assertStringEndsWith('/route/v1/driving/2.400000,48.950000;2.350000,48.850000', $this->history[1]['request']->getUri()->getPath());
+        $this->assertSame(2, $this->http->getRequestsCount());
+        $first = $this->requestedUrl(0);
+        $this->assertStringEndsWith('/route/v1/driving/2.360000,48.860000;2.350000,48.850000', $first['path']);
+        $this->assertSame(['overview' => 'full', 'geometries' => 'geojson'], $first['query']);
+        $this->assertStringEndsWith('/route/v1/driving/2.400000,48.950000;2.350000,48.850000', $this->requestedUrl(1)['path']);
     }
 
     public function testDisabledRouterReturnsNoGeometryWithoutHttpCall(): void
@@ -127,13 +139,13 @@ final class OsrmRouterTest extends TestCase
         $router = new OsrmRouter('', $this->mockHttpClient([]));
 
         $this->assertSame([null, null], $router->getRouteGeometriesToPoint(48.85, 2.35, $this->destinations()));
-        $this->assertSame([], $this->history);
+        $this->assertSame(0, $this->http->getRequestsCount());
     }
 
     public function testRouteErrorsDegradeToNullPerOrigin(): void
     {
         $router = new OsrmRouter($this->fakeBaseUrl(), $this->mockHttpClient([
-            new Response(200, [], json_encode(['code' => 'NoRoute'])),
+            $this->jsonResponse(['code' => 'NoRoute']),
             $this->routeResponse([[2.40, 48.95], [2.35, 48.85]]),
         ]));
 
@@ -154,7 +166,7 @@ final class OsrmRouterTest extends TestCase
             ->getRouteGeometriesToPoint(48.85, 2.35, $origins);
 
         $this->assertSame($first, $second);
-        $this->assertSame([], $this->history);
+        $this->assertSame(0, $this->http->getRequestsCount());
     }
 
     public function testDisabledRouterReturnsNullsWithoutHttpCall(): void
@@ -166,7 +178,7 @@ final class OsrmRouterTest extends TestCase
             [null, null],
             $router->getRoutesFromPoint(self::ORIGIN_LAT, self::ORIGIN_LNG, $this->destinations()),
         );
-        $this->assertCount(0, $this->history);
+        $this->assertSame(0, $this->http->getRequestsCount());
     }
 
     public function testEmptyDestinationsShortCircuit(): void
@@ -174,7 +186,7 @@ final class OsrmRouterTest extends TestCase
         $router = new OsrmRouter($this->fakeBaseUrl(), $this->mockHttpClient([]));
 
         $this->assertSame([], $router->getRoutesFromPoint(self::ORIGIN_LAT, self::ORIGIN_LNG, []));
-        $this->assertCount(0, $this->history);
+        $this->assertSame(0, $this->http->getRequestsCount());
     }
 
     public function testRoutesAreMappedFromTheTableResponse(): void
@@ -193,23 +205,23 @@ final class OsrmRouterTest extends TestCase
 
         // One table request: origin first (lng,lat), then each destination,
         // with sources=0 and both annotations
-        $this->assertCount(1, $this->history);
-        $request = $this->history[0]['request'];
+        $this->assertSame(1, $this->http->getRequestsCount());
+        $request = $this->requestedUrl(0);
         $this->assertStringContainsString(
             '/table/v1/driving/2.350000,48.850000;2.360000,48.860000;2.400000,48.950000',
-            $request->getUri()->getPath(),
+            $request['path'],
         );
-        $this->assertSame('sources=0&annotations=duration%2Cdistance', $request->getUri()->getQuery());
+        $this->assertSame(['sources' => '0', 'annotations' => 'duration,distance'], $request['query']);
     }
 
     public function testMissingMatrixEntriesYieldNulls(): void
     {
         $router = new OsrmRouter($this->fakeBaseUrl(), $this->mockHttpClient([
-            new Response(200, [], json_encode([
+            $this->jsonResponse([
                 'code'      => 'Ok',
                 'durations' => [[0, 600]],
                 'distances' => [[0, 5000]],
-            ])),
+            ]),
         ]));
 
         $this->assertSame(
@@ -222,9 +234,9 @@ final class OsrmRouterTest extends TestCase
     {
         foreach (
             [
-                new Response(200, [], json_encode(['code' => 'NoTable'])),
-                new Response(500, [], 'boom'),
-                new Response(200, [], 'this is not json'),
+                $this->jsonResponse(['code' => 'NoTable']),
+                new MockResponse('boom', ['http_code' => 500]),
+                new MockResponse('this is not json'),
             ] as $response
         ) {
             $router = new OsrmRouter($this->fakeBaseUrl(), $this->mockHttpClient([$response]));
@@ -248,14 +260,14 @@ final class OsrmRouterTest extends TestCase
             ->getRoutesFromPoint(self::ORIGIN_LAT, self::ORIGIN_LNG, $this->destinations());
 
         $this->assertSame($first, $second);
-        $this->assertCount(0, $this->history);
+        $this->assertSame(0, $this->http->getRequestsCount());
     }
 
     public function testFailedLookupsAreNotCached(): void
     {
         $base_url = $this->fakeBaseUrl();
 
-        $first = (new OsrmRouter($base_url, $this->mockHttpClient([new Response(500, [], 'boom')])))
+        $first = (new OsrmRouter($base_url, $this->mockHttpClient([new MockResponse('boom', ['http_code' => 500])])))
             ->getRoutesFromPoint(self::ORIGIN_LAT, self::ORIGIN_LNG, $this->destinations());
         $this->assertSame([null, null], $first);
 
