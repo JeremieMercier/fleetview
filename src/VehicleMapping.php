@@ -53,7 +53,7 @@ use Session;
  */
 final class VehicleMapping extends CommonDBTM
 {
-    public static $rightname = 'config';
+    public static string $rightname = 'config';
 
     /**
      * Associations covering an entity (their own entity, or an ancestor

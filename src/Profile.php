@@ -51,7 +51,7 @@ final class Profile extends CommonGLPI
     /** Right name in the `glpi_profilerights` table */
     public const RIGHTNAME = 'plugin_fleetview_map';
 
-    public static $rightname = 'profile';
+    public static string $rightname = 'profile';
 
     public static function getTypeName($nb = 0): string
     {
