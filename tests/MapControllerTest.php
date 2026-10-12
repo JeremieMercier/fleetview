@@ -1000,8 +1000,8 @@ final class MapControllerTest extends DbTestCase
         $this->login('post-only');
         $_SESSION['glpiactiveprofile'][Profile::RIGHTNAME] = READ;
         $_SESSION['glpiactiveprofile']['planning']         = Planning::READALL;
-        $this->assertFalse(Session::haveRight(\Ticket::$rightname, Ticket::READALL));
-        $this->assertTrue(Session::haveRight(\Ticket::$rightname, Ticket::READMY));
+        $this->assertFalse(Session::haveRight(Ticket::$rightname, Ticket::READALL));
+        $this->assertTrue(Session::haveRight(Ticket::$rightname, Ticket::READMY));
         $this->assertTrue(Session::haveRight('task', TicketTask::SEEPUBLIC));
 
         $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
