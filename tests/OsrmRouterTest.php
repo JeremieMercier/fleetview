@@ -43,9 +43,9 @@ use Symfony\Component\HttpClient\Response\MockResponse;
  */
 final class OsrmRouterTest extends TestCase
 {
-    private const ORIGIN_LAT = 48.85;
+    private const float ORIGIN_LAT = 48.85;
 
-    private const ORIGIN_LNG = 2.35;
+    private const float ORIGIN_LNG = 2.35;
 
     /** @var list<MockResponse> Queued responses, each one recording the request it served */
     private array $responses = [];

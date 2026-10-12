@@ -70,7 +70,7 @@ use function Safe\json_decode;
 final class MasternautClient
 {
     /** Minimal cache lifetime, aligned with the API rate limit (seconds) */
-    private const MIN_CACHE_LIFETIME = 15;
+    private const int MIN_CACHE_LIFETIME = 15;
 
     /** @var array<string, string> */
     private array $config;

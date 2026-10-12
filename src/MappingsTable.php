@@ -57,11 +57,11 @@ use Collator;
 final class MappingsTable
 {
     /** Text filters (substring, case-insensitive) and exact-match filters */
-    private const TEXT_FILTERS  = ['name', 'registration', 'make_model'];
+    private const array TEXT_FILTERS  = ['name', 'registration', 'make_model'];
 
-    private const EXACT_FILTERS = ['group', 'type', 'status_label'];
+    private const array EXACT_FILTERS = ['group', 'type', 'status_label'];
 
-    public const SORTABLE = ['name', 'registration', 'group', 'type', 'make_model', 'status_label', 'state'];
+    public const array SORTABLE = ['name', 'registration', 'group', 'type', 'make_model', 'status_label', 'state'];
 
     /**
      * Association state of a row: explicitly associated, suggested by name

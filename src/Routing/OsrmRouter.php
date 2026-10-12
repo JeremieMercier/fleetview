@@ -52,7 +52,7 @@ use function Safe\json_decode;
 final class OsrmRouter
 {
     /** Routes barely change for near-identical coordinates: cache aggressively (seconds) */
-    private const CACHE_LIFETIME = 300;
+    private const int CACHE_LIFETIME = 300;
 
     /**
      * @param ?HttpClientInterface $http_client HTTP client override, mainly for

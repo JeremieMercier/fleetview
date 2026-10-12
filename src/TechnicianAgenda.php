@@ -339,6 +339,7 @@ final class TechnicianAgenda
                     $guests[] = (int) $guest;
                 }
             }
+
             $owner  = is_numeric($row['users_id'] ?? null) ? (int) $row['users_id'] : 0;
 
             $id     = (int) $row['id'];

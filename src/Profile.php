@@ -49,7 +49,7 @@ use Ticket;
 final class Profile extends CommonGLPI
 {
     /** Right name in the `glpi_profilerights` table */
-    public const RIGHTNAME = 'plugin_fleetview_map';
+    public const string RIGHTNAME = 'plugin_fleetview_map';
 
     public static string $rightname = 'profile';
 
@@ -80,7 +80,7 @@ final class Profile extends CommonGLPI
      */
     public static function canViewMap(): bool
     {
-        return (bool) Session::haveRight(self::RIGHTNAME, READ);
+        return Session::haveRight(self::RIGHTNAME, READ);
     }
 
     public function getTabNameForItem(CommonGLPI $item, $withtemplate = 0): string
