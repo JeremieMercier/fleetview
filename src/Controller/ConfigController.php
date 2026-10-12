@@ -45,7 +45,7 @@ use Symfony\Component\Routing\Attribute\Route;
 /**
  * Saves the two forms of the plugin configuration page (API settings and
  * vehicle to user associations). CSRF is enforced by the core
- * CheckCsrfListener (`_glpi_csrf_token` field of the forms).
+ * CheckCsrfListener (browser origin headers).
  */
 final class ConfigController extends AbstractController
 {
