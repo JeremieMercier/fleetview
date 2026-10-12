@@ -332,8 +332,14 @@ final class TechnicianAgenda
                 continue;
             }
 
-            $guests = is_string($row['users_id_guests'] ?? null) ? importArrayFromDB($row['users_id_guests']) : [];
-            $guests = array_map(intval(...), array_filter($guests, is_numeric(...)));
+            $raw_guests = is_string($row['users_id_guests'] ?? null) ? importArrayFromDB($row['users_id_guests']) : [];
+            $guests     = [];
+            foreach (is_array($raw_guests) ? $raw_guests : [] as $guest) {
+                if (is_numeric($guest)) {
+                    $guests[] = (int) $guest;
+                }
+            }
+
             $owner  = is_numeric($row['users_id'] ?? null) ? (int) $row['users_id'] : 0;
 
             $id     = (int) $row['id'];

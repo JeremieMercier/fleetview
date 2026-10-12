@@ -32,7 +32,6 @@
 {% import 'components/form/fields_macros.html.twig' as fields %}
 
 <form method="post" action="{{ form_action }}" data-track-changes="true">
-    <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token() }}" />
     <input type="hidden" name="_tab" value="1" />
 
     <div class="card">

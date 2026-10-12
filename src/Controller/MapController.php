@@ -68,7 +68,7 @@ use function Safe\json_decode;
 final class MapController extends AbstractController
 {
     /** Closest vehicles whose road route is drawn (matches the ranked marker colors) */
-    private const DRAWN_ROUTES = 3;
+    private const int DRAWN_ROUTES = 3;
 
     /**
      * The factories build the API clients from the runtime configuration

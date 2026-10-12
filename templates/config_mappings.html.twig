@@ -54,7 +54,6 @@
             </p>
 
             <form method="post" action="{{ mappings_action }}" id="fleetview-mappings-form">
-                <input type="hidden" name="_glpi_csrf_token" value="{{ csrf_token() }}" />
 
                 {% set columns = {
                     'name': __('Vehicle', 'fleetview'),

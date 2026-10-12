@@ -29,7 +29,7 @@
  * -------------------------------------------------------------------------
  */
 
-/* global bootstrap, L, getAjaxCsrfToken, _ */
+/* global bootstrap, L, _ */
 
 (() => {
     'use strict';
@@ -142,7 +142,6 @@
                 headers: {
                     'Content-Type': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest',
-                    'X-Glpi-Csrf-Token': getAjaxCsrfToken(),
                 },
                 body: JSON.stringify({ users_id: Number(button.dataset.usersId) }),
             });

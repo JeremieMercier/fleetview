@@ -44,10 +44,6 @@ use GlpiPlugin\Fleetview\PluginConfig;
 use GlpiPlugin\Fleetview\Profile;
 use GlpiPlugin\Fleetview\Routing\OsrmRouter;
 use GlpiPlugin\Fleetview\VehicleMapping;
-use GuzzleHttp\Client;
-use GuzzleHttp\Handler\MockHandler;
-use GuzzleHttp\HandlerStack;
-use GuzzleHttp\Psr7\Response;
 use Group;
 use Group_User;
 use Location;
@@ -57,6 +53,8 @@ use Profile_User;
 use PlanningEventCategory;
 use PlanningExternalEvent;
 use Session;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Ticket;
@@ -403,11 +401,11 @@ final class MapControllerTest extends DbTestCase
     }
 
     /**
-     * @param list<Response> $responses
+     * @param list<MockResponse> $responses
      */
-    private function mockedHttpClient(array $responses): Client
+    private function mockedHttpClient(array $responses): MockHttpClient
     {
-        return new Client(['handler' => HandlerStack::create(new MockHandler($responses))]);
+        return new MockHttpClient($responses);
     }
 
     /**
@@ -416,14 +414,14 @@ final class MapControllerTest extends DbTestCase
      * circulation, ~1.6 km) and asset 202 (Martin Sophie, in maintenance,
      * ~9 km) — OSRM makes 202 the fastest despite being the farthest.
      *
-     * @param list<Response>  $masternaut_responses
-     * @param ?list<Response> $osrm_responses       Table response first, then
+     * @param list<MockResponse>  $masternaut_responses
+     * @param ?list<MockResponse> $osrm_responses       Table response first, then
      *        one route response per vehicle when routes are enabled
      */
     private function mockedController(?array $masternaut_responses = null, ?array $osrm_responses = null): MapController
     {
         $masternaut_responses ??= [
-            new Response(200, [], json_encode(['items' => [
+            new MockResponse(json_encode(['items' => [
                 [
                     'id'        => '201',
                     'name'      => 'Dupont Jean',
@@ -437,7 +435,7 @@ final class MapControllerTest extends DbTestCase
                     'status'    => 'IN_MAINTENANCE',
                 ],
             ]])),
-            new Response(200, [], json_encode(['items' => [
+            new MockResponse(json_encode(['items' => [
                 [
                     'assetId'   => '201',
                     'assetName' => 'Dupont Jean',
@@ -454,7 +452,7 @@ final class MapControllerTest extends DbTestCase
         ];
 
         $osrm_responses ??= [
-            new Response(200, [], json_encode([
+            new MockResponse(json_encode([
                 'code'      => 'Ok',
                 'durations' => [[0, 1800, 600]],
                 'distances' => [[0, 12000, 9500]],
@@ -597,7 +595,7 @@ final class MapControllerTest extends DbTestCase
 
         // Only the linked vehicle reaches the routing service
         $controller = $this->mockedController(null, [
-            new Response(200, [], json_encode([
+            new MockResponse(json_encode([
                 'code'      => 'Ok',
                 'durations' => [[0, 600]],
                 'distances' => [[0, 9500]],
@@ -635,7 +633,7 @@ final class MapControllerTest extends DbTestCase
         $this->assertTrue($payload['show_unlinked']);
         $this->assertSame(['202', '201'], array_column($payload['vehicles'], 'id'));
 
-        $one_route = [new Response(200, [], json_encode(['code' => 'Ok', 'durations' => [[0, 600]], 'distances' => [[0, 9500]]]))];
+        $one_route = [new MockResponse(json_encode(['code' => 'Ok', 'durations' => [[0, 600]], 'distances' => [[0, 9500]]]))];
         $this->configurePluginApi(['modal_show_unlinked' => '1']);
         $payload = $this->payload($this->mockedController(null, $one_route)->ticketVehicles(Request::create('', 'GET', ['show_unlinked' => '0']), $ticket->getID()));
         $this->assertFalse($payload['show_unlinked']);
@@ -657,7 +655,7 @@ final class MapControllerTest extends DbTestCase
         // the root entity tree
         $technician_id = $this->createTechnician('Technician', $this->rootEntityId(), true);
 
-        $one_route = [new Response(200, [], json_encode(['code' => 'Ok', 'durations' => [[0, 1800]], 'distances' => [[0, 12000]]]))];
+        $one_route = [new MockResponse(json_encode(['code' => 'Ok', 'durations' => [[0, 1800]], 'distances' => [[0, 12000]]]))];
         $payload = $this->payload($this->mockedController(null, $one_route)->ticketVehicles(Request::create(''), $ticket->getID()));
 
         $this->assertSame(['201'], array_column($payload['vehicles'], 'id'));
@@ -673,7 +671,7 @@ final class MapControllerTest extends DbTestCase
         $ticket = $this->createTicket($this->createGeoLocation()->getID());
         VehicleMapping::save('202', 'Martin Sophie', 4242);
 
-        $one_route = [new Response(200, [], json_encode(['code' => 'Ok', 'durations' => [[0, 600]], 'distances' => [[0, 9500]]]))];
+        $one_route = [new MockResponse(json_encode(['code' => 'Ok', 'durations' => [[0, 600]], 'distances' => [[0, 9500]]]))];
         $payload = $this->payload($this->mockedController(null, $one_route)->ticketVehicles(Request::create(''), $ticket->getID()));
 
         $this->assertSame(['202'], array_column($payload['vehicles'], 'id'));
@@ -731,7 +729,7 @@ final class MapControllerTest extends DbTestCase
         $this->configurePluginApi();
         $ticket = $this->createTicket($this->createGeoLocation()->getID());
 
-        $response = $this->mockedController([new Response(500, [], 'boom')])
+        $response = $this->mockedController([new MockResponse('boom', ['http_code' => 500])])
             ->ticketVehicles(Request::create(''), $ticket->getID());
         $payload = $this->payload($response);
 
@@ -813,12 +811,12 @@ final class MapControllerTest extends DbTestCase
         $this->configurePluginApi(['map_show_routes' => '1']);
         $ticket = $this->createTicket($this->createGeoLocation()->getID());
 
-        $route = static fn(array $coordinates): Response => new Response(200, [], json_encode([
+        $route = static fn(array $coordinates): MockResponse => new MockResponse(json_encode([
             'code'   => 'Ok',
             'routes' => [['geometry' => ['type' => 'LineString', 'coordinates' => $coordinates]]],
         ]));
         $controller = $this->mockedController(null, [
-            new Response(200, [], json_encode([
+            new MockResponse(json_encode([
                 'code'      => 'Ok',
                 'durations' => [[0, 1800, 600]],
                 'distances' => [[0, 12000, 9500]],
@@ -1002,9 +1000,9 @@ final class MapControllerTest extends DbTestCase
         $this->login('post-only');
         $_SESSION['glpiactiveprofile'][Profile::RIGHTNAME] = READ;
         $_SESSION['glpiactiveprofile']['planning']         = Planning::READALL;
-        $this->assertFalse((bool) Session::haveRight('ticket', Ticket::READALL));
-        $this->assertTrue((bool) Session::haveRight('ticket', Ticket::READMY));
-        $this->assertTrue((bool) Session::haveRight('task', TicketTask::SEEPUBLIC));
+        $this->assertFalse(Session::haveRight(Ticket::$rightname, Ticket::READALL));
+        $this->assertTrue(Session::haveRight(Ticket::$rightname, Ticket::READMY));
+        $this->assertTrue(Session::haveRight('task', TicketTask::SEEPUBLIC));
 
         $payload = $this->payload($this->mockedController()->ticketVehicles(Request::create(''), $ticket->getID()));
         $this->assertSame([$mine], array_column($payload['vehicles'][0]['planned_tasks'], 'id'));

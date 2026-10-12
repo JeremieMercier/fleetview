@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- GLPI 12 is required (PHP 8.3+). GLPI 11 installations stay on the 0.x
+  series, maintained on the `0.x/bugfixes` branch: GLPI 12 types the
+  `CommonGLPI::$rightname` property, which a single code base cannot satisfy
+  on both versions.
+- Requests to the Masternaut API and to the routing service go through the
+  Symfony HTTP client, honouring the GLPI proxy settings as before (GLPI 12
+  removed `Toolbox::getGuzzleClient()` and no longer ships Guzzle). Route
+  geometries are still fetched concurrently.
+
+### Removed
+
+- CSRF tokens in the configuration forms and in the assignment request: GLPI
+  12 validates the request origin from the browser headers instead, and the
+  token helpers are deprecated.
+
 ## [0.6.0] - 2026-09-04
 
 ### Added

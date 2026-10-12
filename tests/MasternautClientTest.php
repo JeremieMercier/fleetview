@@ -33,16 +33,12 @@
 
 namespace GlpiPlugin\Fleetview\Tests;
 
-use Psr\Http\Message\RequestInterface;
 use GlpiPlugin\Fleetview\Masternaut\MasternautApiException;
 use GlpiPlugin\Fleetview\Masternaut\MasternautClient;
 use GlpiPlugin\Fleetview\PluginConfig;
-use GuzzleHttp\Client;
-use GuzzleHttp\Handler\MockHandler;
-use GuzzleHttp\HandlerStack;
-use GuzzleHttp\Middleware;
-use GuzzleHttp\Psr7\Response;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\HttpClient\MockHttpClient;
+use Symfony\Component\HttpClient\Response\MockResponse;
 
 /**
  * All fleet data in these tests is fictional (classic test-dataset names,
@@ -50,8 +46,10 @@ use PHPUnit\Framework\TestCase;
  */
 final class MasternautClientTest extends TestCase
 {
-    /** @var array<int, array{request: RequestInterface}> */
-    private array $history = [];
+    /** @var list<MockResponse> Queued responses, each one recording the request it served */
+    private array $responses = [];
+
+    private MockHttpClient $http;
 
     /**
      * @param array<string, string> $overrides
@@ -70,20 +68,23 @@ final class MasternautClientTest extends TestCase
     }
 
     /**
-     * @param list<Response> $responses
+     * @param list<MockResponse> $responses
      */
-    private function mockHttpClient(array $responses): Client
+    private function mockHttpClient(array $responses): MockHttpClient
     {
-        $this->history = [];
-        $stack = HandlerStack::create(new MockHandler($responses));
-        $stack->push(Middleware::history($this->history));
+        $this->responses = $responses;
 
-        return new Client(['handler' => $stack]);
+        return $this->http = new MockHttpClient($responses);
     }
 
-    private function vehiclesResponse(): Response
+    private function jsonResponse(mixed $data, int $status = 200): MockResponse
     {
-        return new Response(200, [], json_encode(['items' => [
+        return new MockResponse((string) json_encode($data), ['http_code' => $status]);
+    }
+
+    private function vehiclesResponse(): MockResponse
+    {
+        return $this->jsonResponse(['items' => [
             [
                 'id'           => '102',
                 'name'         => 'Martin Sophie',
@@ -106,12 +107,12 @@ final class MasternautClientTest extends TestCase
             ],
             ['registration' => 'NO-ID-01'],
             'garbage-entry',
-        ]]));
+        ]]);
     }
 
-    private function positionsResponse(): Response
+    private function positionsResponse(): MockResponse
     {
-        return new Response(200, [], json_encode(['items' => [
+        return $this->jsonResponse(['items' => [
             // ~1.2 km from the fake ticket point (48.85, 2.35)
             [
                 'assetId'           => '101',
@@ -148,7 +149,7 @@ final class MasternautClientTest extends TestCase
             ],
             // No coordinates: must be ignored
             ['assetId' => '104', 'assetName' => 'Moreau Claire'],
-        ]]));
+        ]]);
     }
 
     public function testIsConfiguredRequiresEveryCredential(): void
@@ -170,7 +171,7 @@ final class MasternautClientTest extends TestCase
         try {
             $client->getVehicles();
         } finally {
-            $this->assertCount(0, $this->history);
+            $this->assertSame(0, $this->http->getRequestsCount());
         }
     }
 
@@ -197,15 +198,15 @@ final class MasternautClientTest extends TestCase
         );
 
         // Endpoint URL and HTTP Basic authentication
-        $this->assertCount(1, $this->history);
-        $request = $this->history[0]['request'];
+        $this->assertSame(1, $this->http->getRequestsCount());
+        $request = $this->responses[0];
         $this->assertSame(
-            '/public/v1/customer/' . $config['customer_id'] . '/vehicle',
-            $request->getUri()->getPath(),
+            'https://fleet.example.test/public/v1/customer/' . $config['customer_id'] . '/vehicle',
+            $request->getRequestUrl(),
         );
         $this->assertSame(
-            'Basic ' . base64_encode('fake_api_user:fake-secret-value'),
-            $request->getHeaderLine('Authorization'),
+            ['Authorization: Basic ' . base64_encode('fake_api_user:fake-secret-value')],
+            $request->getRequestOptions()['normalized_headers']['authorization'] ?? null,
         );
     }
 
@@ -294,7 +295,7 @@ final class MasternautClientTest extends TestCase
 
     public function testAuthenticationFailureRaisesAnExplicitError(): void
     {
-        $client = new MasternautClient($this->fakeConfig(), $this->mockHttpClient([new Response(401)]));
+        $client = new MasternautClient($this->fakeConfig(), $this->mockHttpClient([new MockResponse('', ['http_code' => 401])]));
 
         $this->expectException(MasternautApiException::class);
         $this->expectExceptionMessageMatches('/authentication/i');
@@ -304,7 +305,7 @@ final class MasternautClientTest extends TestCase
 
     public function testRateLimitRaisesAnExplicitError(): void
     {
-        $client = new MasternautClient($this->fakeConfig(), $this->mockHttpClient([new Response(429)]));
+        $client = new MasternautClient($this->fakeConfig(), $this->mockHttpClient([new MockResponse('', ['http_code' => 429])]));
 
         $this->expectException(MasternautApiException::class);
         $this->expectExceptionMessageMatches('/rate limit/i');
@@ -316,7 +317,7 @@ final class MasternautClientTest extends TestCase
     {
         $client = new MasternautClient(
             $this->fakeConfig(),
-            $this->mockHttpClient([new Response(500, [], json_encode(['errorMsg' => 'fake upstream failure']))]),
+            $this->mockHttpClient([$this->jsonResponse(['errorMsg' => 'fake upstream failure'], 500)]),
         );
 
         $this->expectException(MasternautApiException::class);
@@ -329,7 +330,7 @@ final class MasternautClientTest extends TestCase
     {
         $client = new MasternautClient(
             $this->fakeConfig(),
-            $this->mockHttpClient([new Response(200, [], 'this is not json')]),
+            $this->mockHttpClient([new MockResponse('this is not json')]),
         );
 
         $this->expectException(MasternautApiException::class);

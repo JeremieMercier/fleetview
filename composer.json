@@ -1,11 +1,15 @@
 {
+    "name": "jeremiemercier/fleetview",
+    "description": "Nearby technicians map for GLPI tickets, powered by the Masternaut (Michelin Connected Fleet) API",
+    "license": "MIT",
     "require": {
-        "php": ">=8.2"
+        "php": ">=8.3"
     },
     "config": {
+        "autoloader-suffix": "PluginFleetview",
         "optimize-autoloader": true,
         "platform": {
-            "php": "8.2.99"
+            "php": "8.3.99"
         },
         "sort-packages": true
     },

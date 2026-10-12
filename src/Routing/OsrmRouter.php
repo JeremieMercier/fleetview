@@ -33,13 +33,12 @@
 
 namespace GlpiPlugin\Fleetview\Routing;
 
-use GuzzleHttp\ClientInterface;
-use GuzzleHttp\Exception\GuzzleException;
-use GuzzleHttp\Promise\Utils;
-use Psr\Http\Message\ResponseInterface;
+use GlpiPlugin\Fleetview\Http\HttpClientFactory;
 use Psr\SimpleCache\CacheInterface;
 use Safe\Exceptions\JsonException;
-use Throwable;
+use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Contracts\HttpClient\ResponseInterface;
 use Toolbox;
 
 use function Safe\json_decode;
@@ -53,13 +52,13 @@ use function Safe\json_decode;
 final class OsrmRouter
 {
     /** Routes barely change for near-identical coordinates: cache aggressively (seconds) */
-    private const CACHE_LIFETIME = 300;
+    private const int CACHE_LIFETIME = 300;
 
     /**
-     * @param ?ClientInterface $http_client HTTP client override, mainly for
-     *        tests (defaults to the GLPI Guzzle client, proxy-aware)
+     * @param ?HttpClientInterface $http_client HTTP client override, mainly for
+     *        tests (defaults to a proxy-aware client, see HttpClientFactory)
      */
-    public function __construct(private string $base_url, private readonly ?ClientInterface $http_client = null)
+    public function __construct(private string $base_url, private readonly ?HttpClientInterface $http_client = null)
     {
         $this->base_url = rtrim(trim($base_url), '/');
     }
@@ -102,30 +101,31 @@ final class OsrmRouter
         $url = sprintf('%s/table/v1/driving/%s', $this->base_url, $coordinates);
 
         try {
-            $client   = $this->http_client ?? Toolbox::getGuzzleClient(['timeout' => 8]);
+            $client   = $this->http_client ?? $this->createHttpClient();
             $response = $client->request('GET', $url, [
-                'query'       => [
+                'query' => [
                     'sources'     => '0',
                     'annotations' => 'duration,distance',
                 ],
-                'http_errors' => false,
             ]);
-        } catch (GuzzleException $guzzleException) {
-            Toolbox::logInFile('fleetview', sprintf("OSRM request failed: %s\n", $guzzleException->getMessage()));
+            $status = $response->getStatusCode();
+            $body   = $response->getContent(false);
+        } catch (TransportExceptionInterface $transportException) {
+            Toolbox::logInFile('fleetview', sprintf("OSRM request failed: %s\n", $transportException->getMessage()));
             return $none;
         }
 
         try {
-            $data = json_decode((string) $response->getBody(), true);
+            $data = json_decode($body, true);
         } catch (JsonException) {
             $data = null;
         }
 
-        if ($response->getStatusCode() !== 200 || !is_array($data) || ($data['code'] ?? '') !== 'Ok') {
+        if ($status !== 200 || !is_array($data) || ($data['code'] ?? '') !== 'Ok') {
             $code = is_array($data) && is_scalar($data['code'] ?? null) ? (string) $data['code'] : 'unparsable';
             Toolbox::logInFile('fleetview', sprintf(
                 "OSRM returned HTTP %d (code: %s)\n",
-                $response->getStatusCode(),
+                $status,
                 $code,
             ));
             return $none;
@@ -205,34 +205,25 @@ final class OsrmRouter
             return array_values($geometries);
         }
 
-        $client   = $this->http_client ?? Toolbox::getGuzzleClient(['timeout' => 8]);
-        $promises = [];
+        // Responses are lazy: every request is issued first, the transfers
+        // then run concurrently while the responses are read
+        $client    = $this->http_client ?? $this->createHttpClient();
+        $responses = [];
         foreach ($pending as $i => $request) {
-            $promises[$i] = $client->requestAsync('GET', $request['url'], [
-                'query'       => [
-                    'overview'   => 'full',
-                    'geometries' => 'geojson',
-                ],
-                'http_errors' => false,
-            ]);
+            try {
+                $responses[$i] = $client->request('GET', $request['url'], [
+                    'query' => [
+                        'overview'   => 'full',
+                        'geometries' => 'geojson',
+                    ],
+                ]);
+            } catch (TransportExceptionInterface $transportException) {
+                Toolbox::logInFile('fleetview', sprintf("OSRM route request failed: %s\n", $transportException->getMessage()));
+            }
         }
 
-        $results = Utils::settle($promises)->wait();
-        foreach (is_array($results) ? $results : [] as $i => $result) {
-            if (!is_int($i) || !isset($pending[$i]) || !is_array($result)) {
-                continue;
-            }
-
-            if (($result['state'] ?? '') !== 'fulfilled') {
-                $reason = $result['reason'] ?? null;
-                Toolbox::logInFile('fleetview', sprintf(
-                    "OSRM route request failed: %s\n",
-                    $reason instanceof Throwable ? $reason->getMessage() : 'unknown reason',
-                ));
-                continue;
-            }
-
-            $geometry = $this->parseRouteResponse($result['value'] ?? null);
+        foreach ($responses as $i => $response) {
+            $geometry = $this->parseRouteResponse($response);
             if ($geometry !== null) {
                 $geometries[$i] = $geometry;
                 $GLPI_CACHE->set($pending[$i]['cache_key'], $geometry, self::CACHE_LIFETIME);
@@ -242,26 +233,35 @@ final class OsrmRouter
         return array_values($geometries);
     }
 
+    private function createHttpClient(): HttpClientInterface
+    {
+        return HttpClientFactory::create(['max_duration' => 8]);
+    }
+
     /**
      * @return ?list<array{float, float}>
      */
-    private function parseRouteResponse(mixed $response): ?array
+    private function parseRouteResponse(ResponseInterface $response): ?array
     {
-        if (!$response instanceof ResponseInterface) {
+        try {
+            $status = $response->getStatusCode();
+            $body   = $response->getContent(false);
+        } catch (TransportExceptionInterface $transportException) {
+            Toolbox::logInFile('fleetview', sprintf("OSRM route request failed: %s\n", $transportException->getMessage()));
             return null;
         }
 
         try {
-            $data = json_decode((string) $response->getBody(), true);
+            $data = json_decode($body, true);
         } catch (JsonException) {
             $data = null;
         }
 
-        if ($response->getStatusCode() !== 200 || !is_array($data) || ($data['code'] ?? '') !== 'Ok') {
+        if ($status !== 200 || !is_array($data) || ($data['code'] ?? '') !== 'Ok') {
             $code = is_array($data) && is_scalar($data['code'] ?? null) ? (string) $data['code'] : 'unparsable';
             Toolbox::logInFile('fleetview', sprintf(
                 "OSRM route returned HTTP %d (code: %s)\n",
-                $response->getStatusCode(),
+                $status,
                 $code,
             ));
             return null;

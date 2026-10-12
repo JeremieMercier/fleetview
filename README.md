@@ -1,6 +1,6 @@
 # Fleetview — plugin GLPI
 
-Plugin GLPI 11+ d'intégration de l'API **Masternaut** (Michelin Connected
+Plugin GLPI 12 d'intégration de l'API **Masternaut** (Michelin Connected
 Fleet), l'outil de géolocalisation des véhicules des techniciens.
 
 Sur le formulaire de ticket, sous le champ d'attribution du technicien, un
@@ -20,8 +20,9 @@ entités des associations véhicule / technicien.
 
 ## Prérequis
 
-- GLPI >= 11.0
-- PHP >= 8.2
+- GLPI 12.0 (série 1.x du plugin) ; pour GLPI 11, installer la série 0.x
+  (dernière version : 0.6.0, maintenue sur la branche `0.x/bugfixes`)
+- PHP >= 8.3
 - Un accès à l'API Masternaut
 
 ## Installation (production)
@@ -109,8 +110,8 @@ Puis installer et activer le plugin depuis *Configuration → Plugins*, ou en
 ligne de commande depuis le dossier GLPI :
 
 ```bash
-php bin/console glpi:plugin:install fleetview -u glpi
-php bin/console glpi:plugin:activate fleetview
+php bin/console plugin:install fleetview -u glpi
+php bin/console plugin:activate fleetview
 ```
 
 > Note : les outils qualité et les tests supposent que le plugin est

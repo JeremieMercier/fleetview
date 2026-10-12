@@ -54,15 +54,15 @@ use function Safe\parse_url;
  */
 final class PluginConfig extends CommonGLPI
 {
-    public const CONTEXT = 'plugin:fleetview';
+    public const string CONTEXT = 'plugin:fleetview';
 
     /**
      * Values encrypted with GLPIKey in the `glpi_configs` table.
      * Also declared to the SECURED_CONFIGS hook in setup.php.
      */
-    public const SECURED = ['api_secret'];
+    public const array SECURED = ['api_secret'];
 
-    public static $rightname = 'config';
+    public static string $rightname = 'config';
 
     public static function getTypeName($nb = 0): string
     {
