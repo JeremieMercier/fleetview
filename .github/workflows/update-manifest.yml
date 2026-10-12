@@ -44,6 +44,8 @@ jobs:
 
           tag = os.environ['TAG']
           repository = os.environ['REPOSITORY']
+          # 0.x targets GLPI 11, 1.x and later target GLPI 12
+          compatibility = '~11.0.0' if tag.startswith('0.') else '~12.0.0'
           path = 'fleetview.xml'
           xml = open(path).read()
 
@@ -59,7 +61,7 @@ jobs:
               '   <versions>\n'
               '      <version>\n'
               f'         <num>{tag}</num>\n'
-              '         <compatibility>~11.0.0</compatibility>\n'
+              f'         <compatibility>{compatibility}</compatibility>\n'
               f'         <download_url>{download}</download_url>\n'
               '      </version>\n'
           )
